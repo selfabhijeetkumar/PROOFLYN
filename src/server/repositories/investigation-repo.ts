@@ -250,6 +250,10 @@ interface FollowUpRow {
 export class InvestigationRepository {
   constructor(private readonly db: SqliteDatabase = getDb()) {}
 
+  runInTransaction<T>(fn: () => T): T {
+    return this.db.transaction(fn)();
+  }
+
   // === Organizations & Users ===
 
   upsertOrganization(org: Organization): void {

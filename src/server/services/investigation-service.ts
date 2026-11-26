@@ -14,6 +14,9 @@ import {
   generateId,
   type User,
   type InvestigationCase,
+  type SourceDocument,
+  type DocumentType,
+  type ExtractionMethod,
   type McpCaseContext,
   type McpReconcileResult,
   type McpGapResult,
@@ -550,6 +553,205 @@ export class InvestigationService {
       { draftId: draft.id, reportId: report.id }
     );
     return draft;
+  }
+
+  createInvestigationCase(
+    actorId: string,
+    input: {
+      caseNumber: string;
+      title: string;
+      description?: string;
+      buyerName?: string;
+      supplierName?: string;
+    }
+  ): InvestigationCase {
+    const actor = this.repo.getUserById(actorId);
+    if (!actor) {
+      throw new ServiceError('UNAUTHORIZED', 'Authenticated actor not found.', 401);
+    }
+
+    const existing = this.repo.getCaseByNumberForOrg(input.caseNumber.trim(), actor.organizationId);
+    if (existing) {
+      throw new ServiceError(
+        'DUPLICATE_CASE_NUMBER',
+        `Case number "${input.caseNumber.trim()}" already exists in this organization.`,
+        409
+      );
+    }
+
+    const now = new Date().toISOString();
+    const newCase: InvestigationCase = {
+      id: generateId(),
+      caseNumber: input.caseNumber.trim(),
+      title: input.title.trim(),
+      description: (input.description ?? '').trim(),
+      status: 'CREATED',
+      organizationId: actor.organizationId,
+      createdBy: actor.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.repo.runInTransaction(() => {
+      this.repo.createCase(newCase);
+      if (input.buyerName?.trim()) {
+        this.repo.addParty({
+          id: generateId(),
+          caseId: newCase.id,
+          name: input.buyerName.trim(),
+          role: 'BUYER',
+        });
+      }
+      if (input.supplierName?.trim()) {
+        this.repo.addParty({
+          id: generateId(),
+          caseId: newCase.id,
+          name: input.supplierName.trim(),
+          role: 'SUPPLIER',
+        });
+      }
+      this.repo.appendEvent(
+        newCase.id,
+        'CASE_CREATED',
+        actor.id,
+        `Created investigation case ${newCase.caseNumber}: ${newCase.title}`,
+        { caseNumber: newCase.caseNumber }
+      );
+    });
+
+    return newCase;
+  }
+
+  recordDocumentAndExtraction(
+    caseId: string,
+    actorId: string,
+    doc: Omit<SourceDocument, 'caseId' | 'uploadedBy'>,
+    fields: ExtractedField[],
+    extractionMethod: ExtractionMethod,
+    warning: string | null
+  ): { document: SourceDocument; fields: ExtractedField[]; warning: string | null } {
+    const { actor, caseData } = this.authorizeCaseAccess(caseId, actorId);
+    const fullDoc: SourceDocument = {
+      ...doc,
+      caseId: caseData.id,
+      uploadedBy: actor.id,
+    };
+
+    this.repo.runInTransaction(() => {
+      this.repo.addSourceDocument(fullDoc);
+      for (const f of fields) {
+        this.repo.addExtractedField(f);
+      }
+      const allFields = this.repo.listExtractedFields(caseData.id);
+      this.repo.syncDomainRecordForDocument(fullDoc, allFields);
+      this.repo.updateCaseStatus(
+        caseData.id,
+        fields.length > 0 ? 'EXTRACTION_COMPLETE' : 'DOCUMENTS_UPLOADED'
+      );
+      this.repo.appendEvent(
+        caseData.id,
+        'DOCUMENT_ADDED',
+        actor.id,
+        `Uploaded ${fullDoc.documentType} (${fullDoc.originalFilename}).`,
+        {
+          documentId: fullDoc.id,
+          documentType: fullDoc.documentType,
+          sha256: fullDoc.sha256,
+          sizeBytes: fullDoc.sizeBytes,
+        }
+      );
+      this.repo.appendEvent(
+        caseData.id,
+        'EXTRACTION_RUN',
+        actor.id,
+        fields.length > 0
+          ? `Extracted ${fields.length} field(s) using ${extractionMethod}.`
+          : `Extraction (${extractionMethod}) produced 0 structured fields.${warning ? ` ${warning}` : ''}`,
+        {
+          documentId: fullDoc.id,
+          method: extractionMethod,
+          fieldCount: fields.length,
+          warning,
+        }
+      );
+    });
+
+    return { document: fullDoc, fields, warning };
+  }
+
+  addManualField(
+    caseId: string,
+    actorId: string,
+    input: {
+      documentId: string;
+      fieldName: string;
+      value: string;
+      numericValue?: number | null;
+      currency?: Currency | null;
+      unit?: QuantityUnit | null;
+      presence?: FieldPresence;
+    }
+  ): ExtractedField {
+    const { actor, caseData } = this.authorizeCaseAccess(caseId, actorId);
+    const doc = this.repo.getSourceDocument(caseData.id, input.documentId);
+    if (!doc) {
+      throw new ServiceError('NOT_FOUND', 'Target source document not found in this case.', 404);
+    }
+
+    const trimmed = input.value.trim();
+    const presence: FieldPresence = input.presence ?? 'PRESENT';
+    let numericValue: number | null = input.numericValue ?? null;
+
+    if (presence === 'PRESENT' && ['quantity', 'unit_price', 'total_amount'].includes(input.fieldName) && numericValue === null) {
+      const parsed = Number(trimmed);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        throw new ServiceError(
+          'VALIDATION_ERROR',
+          `Field "${input.fieldName}" requires a non-negative integer value (minor units for money, integer for quantity).`,
+          400
+        );
+      }
+      numericValue = parsed;
+    }
+
+    const now = new Date().toISOString();
+    const field: ExtractedField = {
+      id: generateId(),
+      documentId: doc.id,
+      caseId: caseData.id,
+      fieldName: input.fieldName.trim(),
+      rawText: trimmed,
+      extractedValue: presence === 'PRESENT' ? trimmed : null,
+      numericValue,
+      currency: input.currency ?? null,
+      unit: input.unit ?? null,
+      presence,
+      sourcePageNumber: null,
+      sourceOffset: 'manual-entry',
+      extractionMethod: 'MANUAL',
+      extractionVersion: '1.0.0',
+      status: 'EXTRACTED',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.repo.runInTransaction(() => {
+      this.repo.addExtractedField(field);
+      this.repo.syncDomainRecordForDocument(doc, this.repo.listExtractedFields(caseData.id));
+      this.repo.appendEvent(
+        caseData.id,
+        'EVIDENCE_CHANGE',
+        actor.id,
+        `Added manual field "${field.fieldName}" on ${doc.originalFilename}.`,
+        { fieldId: field.id, documentId: doc.id, method: 'MANUAL' }
+      );
+    });
+
+    return field;
+  }
+
+  getAllowedDocumentTypes(): DocumentType[] {
+    return ['PURCHASE_ORDER', 'INVOICE', 'DELIVERY_RECORD', 'SUPPORTING'];
   }
 }
 

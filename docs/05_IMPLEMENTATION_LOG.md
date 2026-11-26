@@ -12,3 +12,8 @@
 
 - **M3 Verified & Cleaned**: Inspected and verified `src/server/repositories/investigation-repo.ts` (removed unused `OrgRow` lint warning), `src/server/services/investigation-service.ts`, `src/server/logger.ts`, `src/db/seed-data.ts`, `src/mcp/server.ts` (6 tools: `get_case_context`, `reconcile_case_records`, `detect_evidence_gaps`, `assess_payment_blockers`, `get_evidence_graph`, `generate_evidence_report`), `src/mcp/gateway.ts`, and `src/mcp/smoke-test.ts`.
 - **Verification**: `npm run typecheck` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm test` (18/18 passed), `npm run mcp:smoke` (PASSED: all 6 tools discovered over real stdio transport, unknown field rejected, INV-1047 `R-QTY-01` 100 vs 90 discrepancy asserted, 6 `SUCCESS` rows persisted in `mcp_tool_calls`).
+
+## 2026-11-27T04:30+05:30 — M4 Complete
+
+- **M4 Server & API Layer**: Implemented `src/server/auth.ts` (HMAC-SHA256 signed `httpOnly` cookie sessions + RBAC), `src/server/rate-limit.ts`, `src/server/upload.ts` (extension allowlist, magic-byte validation, executable/archive rejection, 10 MB cap, UUID storage outside `public/`), `src/server/extraction.ts` (`PDF_TEXT` with `Uint8Array` copy fix for `pdf-parse`/`pdf.js` on Node v26, `CSV_PARSE`, `MANUAL`, optional `AI_VISION` gated on `GEMINI_API_KEY`), `src/server/api-helpers.ts`, `src/db/seed.ts`, `src/db/reset.ts`, and 21 REST route handlers under `src/app/api/v1/`.
+- **Verification**: `npm run typecheck` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm test` (22/22 passed: 18 core unit tests + 4 comprehensive M4 API/security/upload/MCP/RBAC/idempotency integration tests).

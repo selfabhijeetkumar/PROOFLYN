@@ -2,13 +2,14 @@ STATUS: IN_PROGRESS
 # PROOFLYN MODEL HANDOFF
 
 ## CURRENT MILESTONE / TASK
-M4: Implement REST API (`/api/v1/...`), auth/session cookies, rate limiting, secure upload (magic bytes + 10 MB cap + UUID storage), layered extraction (`MANUAL`/`PDF_TEXT`/`CSV_PARSE`/optional `AI_VISION`), human verification, and API integration tests.
+M5 & M6: Implement frozen-style functional Next.js frontend (`src/app/` and `src/components/`) wired to `/api/v1/*`, report preview/download UI, and `docs/07_DESIGN_HANDOFF.md`.
 
 ## COMPLETED MILESTONES
 - **M0 (2026-11-27T03:45+05:30)**: Environment/skills/MCP activation (`docs/00_ENVIRONMENT_SKILLS_MCP_ACTIVATION.md`), workspace audit (`docs/01_WORKSPACE_AND_SOURCE_AUDIT.md`), final product spec & challenge review (`docs/02_FINAL_PRODUCT_SPECIFICATION_AND_CHALLENGE_REVIEW.md`), decision register (`docs/05_DECISION_REGISTER.md`), `.gsd/SPEC.md` (`FINALIZED`). Verified `context7` via `resolve-library-id` & `query-docs` on `@modelcontextprotocol/sdk`.
 - **M1 (2026-11-27T03:49+05:30)**: Clean dependency install (`pnpm install`, `pnpm-lock.yaml`), switched DB driver from `better-sqlite3` to Node v26 built-in `node:sqlite` (`src/db/sqlite.ts`), added migration `002_domain_entities_and_idempotency`, `eslint.config.mjs`, `docs/03_SYSTEM_ARCHITECTURE.md`, `docs/04_DATA_MODEL_AND_API_CONTRACTS.md`. Verified `npm run db:migrate` (exit 0).
 - **M2 (2026-11-27T03:49+05:30)**: Hardened `src/core/` (`crypto.ts`, `reconciliation.ts`, `evidence-gaps.ts`, `payment-blockers.ts`, `evidence-graph.ts`, `report-builder.ts`) and expanded unit tests (`src/core/__tests__/reconciliation.test.ts`). Verified `npm run typecheck` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm test` (18/18 passed).
-- **M3 (2026-11-27T04:22+05:30)**: Verified & cleaned `src/server/repositories/investigation-repo.ts`, `src/server/services/investigation-service.ts`, `src/server/logger.ts`, `src/db/seed-data.ts`, `src/mcp/server.ts` (6 Zod-validated tools over `StdioServerTransport`), `src/mcp/gateway.ts` (`McpGateway` singleton with timeout + 1 reconnect + `mcp_tool_calls` + `investigation_events` logging), and `src/mcp/smoke-test.ts`. Verified `npm run typecheck` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm test` (18/18 passed), `npm run mcp:smoke` (PASSED: all 6 tools discovered, validated, executed, logged).
+- **M3 (2026-11-27T04:22+05:30)**: Verified & cleaned `src/server/repositories/investigation-repo.ts`, `src/server/services/investigation-service.ts`, `src/server/logger.ts`, `src/db/seed-data.ts`, `src/mcp/server.ts` (6 Zod-validated tools over `StdioServerTransport`), `src/mcp/gateway.ts` (`McpGateway` singleton with timeout + 1 reconnect + `mcp_tool_calls` + `investigation_events` logging), and `src/mcp/smoke-test.ts`. Verified `npm run typecheck` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm test` (18/18 passed), `npm run mcp:smoke` (PASSED). Commit `050851d`.
+- **M4 (2026-11-27T04:30+05:30)**: Implemented `src/server/auth.ts` (scrypt + HMAC `httpOnly` cookie), `src/server/rate-limit.ts`, `src/server/upload.ts` (allowlist + magic-byte validation + 10 MB cap + UUID storage outside `public/`), `src/server/extraction.ts` (`PDF_TEXT` with `Uint8Array` copy fix for `pdf.js`, `CSV_PARSE`, `MANUAL`, optional `AI_VISION`), `src/server/api-helpers.ts`, `src/db/seed.ts`, `src/db/reset.ts`, all 21 `/api/v1/...` route handlers, and `src/server/__tests__/api.test.ts`. Verified `npm run typecheck` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm test` (22/22 passed across 2 test files).
 
 ## FILES CREATED/MODIFIED
 - `.gsd/SPEC.md`, `.gsd/ROADMAP.md`, `.gsd/STATE.md`
@@ -16,14 +17,16 @@ M4: Implement REST API (`/api/v1/...`), auth/session cookies, rate limiting, sec
 - `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `next.config.js`, `eslint.config.mjs`, `src/types/pdf-parse.d.ts`
 - `src/db/sqlite.ts`, `src/db/env.ts`, `src/db/schema.ts`, `src/db/connection.ts`, `src/db/migrate.ts`, `src/db/seed-data.ts`
 - `src/core/types.ts`, `src/core/crypto.ts`, `src/core/reconciliation.ts`, `src/core/evidence-gaps.ts`, `src/core/payment-blockers.ts`, `src/core/evidence-graph.ts`, `src/core/report-builder.ts`, `src/core/index.ts`, `src/core/__tests__/reconciliation.test.ts`
-- `src/server/logger.ts`, `src/server/repositories/investigation-repo.ts`, `src/server/services/investigation-service.ts`
+- `src/server/logger.ts`, `src/server/repositories/investigation-repo.ts`, `src/server/services/investigation-service.ts`, `src/server/auth.ts`, `src/server/rate-limit.ts`, `src/server/upload.ts`, `src/server/extraction.ts`, `src/server/api-helpers.ts`, `src/server/__tests__/api.test.ts`
+- `src/db/seed.ts`, `src/db/reset.ts`
+- `src/app/api/v1/**` (21 REST route handlers)
 - `src/mcp/server.ts`, `src/mcp/gateway.ts`, `src/mcp/smoke-test.ts`
-- Last commit: `2aaa3ec` (M0-M2); M3 commit pending immediately.
+- Last commit: `050851d` (M3); M4 commit pending immediately.
 
 ## TESTS RUN
 - `npm run typecheck` -> PASS (0 errors)
 - `npm run lint` -> PASS (0 errors, 0 warnings)
-- `npm test` -> PASS (`18 passed (18)` in `src/core/__tests__/reconciliation.test.ts`)
+- `npm test` -> PASS (`22 passed (22)` across `reconciliation.test.ts` [18] and `api.test.ts` [4])
 - `npm run db:migrate` -> PASS (`Database migrations applied successfully.`)
 - `npm run mcp:smoke` -> PASS (all 6 tools discovered over stdio, unknown input rejected, INV-1047 `R-QTY-01` verified, 6 `SUCCESS` rows in `mcp_tool_calls`)
 
@@ -42,12 +45,11 @@ M4: Implement REST API (`/api/v1/...`), auth/session cookies, rate limiting, sec
 - AppFlowy MCP: UNAVAILABLE.
 
 ## REMAINING ACCEPTANCE CRITERIA
-- M4 (REST API + auth + upload + extraction + verification + integration tests)
 - M5–M6 (functional frontend + report preview/download + design handoff)
 - M7–M8 (security checks, `npm run verify`, synthetic PDFs, `demo:reset`, acceptance report)
 
 ## NEXT ACTION
-Build M4: implement `src/server/auth.ts`, `src/server/rate-limit.ts`, `src/server/upload.ts`, `src/server/extraction.ts`, `src/server/api-helpers.ts`, REST routes under `src/app/api/v1/`, and M4 integration tests (`src/server/__tests__/api.test.ts`), then run `npm run typecheck`, `npm run lint`, and `npm test`.
+Build M5 & M6: implement `src/app/globals.css` (frozen neutral CSS variables), `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/cases/[id]/page.tsx`, and modular client components under `src/components/` covering all screens and report preview/download, plus `docs/07_DESIGN_HANDOFF.md`.
 
 ## SESSION LOG
 | Timestamp | Model | Outcome |

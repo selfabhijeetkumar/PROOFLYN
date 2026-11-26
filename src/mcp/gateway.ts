@@ -32,10 +32,14 @@ export class McpGateway {
   private client: Client | null = null;
   private transport: StdioClientTransport | null = null;
   private connecting: Promise<Client> | null = null;
+  private activeDatabasePath: string | undefined = undefined;
 
   constructor(private readonly defaultTimeoutMs: number = 15000) {}
 
   private async connect(databasePath?: string): Promise<Client> {
+    if (this.client && databasePath && this.activeDatabasePath && this.activeDatabasePath !== databasePath) {
+      await this.close();
+    }
     if (this.client) return this.client;
     if (this.connecting) return this.connecting;
 
@@ -50,6 +54,7 @@ export class McpGateway {
       if (databasePath) {
         childEnv.DATABASE_PATH = databasePath;
       }
+      this.activeDatabasePath = databasePath ?? process.env.DATABASE_PATH;
 
       const transport = new StdioClientTransport({
         command: process.execPath,
@@ -100,6 +105,7 @@ export class McpGateway {
     }
     this.client = null;
     this.transport = null;
+    this.activeDatabasePath = undefined;
   }
 
   async listTools(options?: McpCallOptions) {
