@@ -2,8 +2,8 @@
 
 > Honest engineering ledger of MVP boundaries, environmental constraints, and deferred items.
 
-1. **Visual Design Intentionally Frozen (Design Pass Deferred):**
-   - Per Design Freeze rules, `src/app/globals.css` uses minimal neutral CSS custom properties only, and `src/components/*` focuses on functional clarity rather than polished aesthetics. See [07_DESIGN_HANDOFF.md](file:///c:/WHACKIEST/docs/07_DESIGN_HANDOFF.md).
+1. **Visual Polish Scope (30-Minute Architectural Ledger Pass Applied):**
+   - The core Architectural Ledger B2B SaaS UI pass has been applied across Dashboard, `INV-1047` workspace, 3-way match matrix, verification tables, SVG graph, timeline, MCP audit panel, and Evidence Pack preview (`docs/07_DESIGN_HANDOFF.md`), while deferred optional enhancements (side-by-side raw PDF/image viewer and print-CSS tuning for exported HTML packs) remain documented in [07_DESIGN_HANDOFF.md](./07_DESIGN_HANDOFF.md).
 2. **Local SQLite Single-Node Persistence:**
    - Persistence uses Node v26 built-in `node:sqlite` (`WAL` mode) on local disk (`./data/prooflyn.db`) wrapped behind `InvestigationRepository`. Concurrent multi-instance scaling would require swapping the repository implementation to PostgreSQL/Supabase.
 3. **In-Memory Rate Limiter:**

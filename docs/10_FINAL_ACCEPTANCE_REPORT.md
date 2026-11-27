@@ -26,8 +26,8 @@
 
 ## Key Artifacts Index
 
-- Verification & Security: [06_TESTING_AND_SECURITY_REPORT.md](file:///c:/WHACKIEST/docs/06_TESTING_AND_SECURITY_REPORT.md)
-- Design Handoff: [07_DESIGN_HANDOFF.md](file:///c:/WHACKIEST/docs/07_DESIGN_HANDOFF.md)
-- Judges Demo Script: [08_JUDGES_DEMO_SCRIPT.md](file:///c:/WHACKIEST/docs/08_JUDGES_DEMO_SCRIPT.md)
-- Known Limitations: [09_KNOWN_LIMITATIONS.md](file:///c:/WHACKIEST/docs/09_KNOWN_LIMITATIONS.md)
-- Implementation Log: [05_IMPLEMENTATION_LOG.md](file:///c:/WHACKIEST/docs/05_IMPLEMENTATION_LOG.md)
+- Verification & Security: [06_TESTING_AND_SECURITY_REPORT.md](./06_TESTING_AND_SECURITY_REPORT.md)
+- Design Handoff: [07_DESIGN_HANDOFF.md](./07_DESIGN_HANDOFF.md)
+- Judges Demo Script: [08_JUDGES_DEMO_SCRIPT.md](./08_JUDGES_DEMO_SCRIPT.md)
+- Known Limitations: [09_KNOWN_LIMITATIONS.md](./09_KNOWN_LIMITATIONS.md)
+- Implementation Log: [05_IMPLEMENTATION_LOG.md](./05_IMPLEMENTATION_LOG.md)

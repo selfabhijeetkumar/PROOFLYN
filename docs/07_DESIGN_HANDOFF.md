@@ -8,8 +8,8 @@
 ## 1. Visual Direction ("Architectural Ledger")
 
 - **Palette:** Crisp Porcelain Slate canvas (`#F4F6F9`), pure white ledger sheets (`#FFFFFF`), 1px hairline borders (`#E2E6EC` / `#CBD3DE`), Deep Ink Navy primary (`#0F2744`), Muted Emerald verified (`#126E47`), Warm Amber needs review (`#A15C07`), Crimson discrepancy/blocker (`#B42318`).
-- **Typography:** Self-hosted Google Fonts (`Plus Jakarta Sans` UI copy + `JetBrains Mono` tabular figures and slashed zeros for case IDs, amounts, variances, and SHA-256 hashes) via `next/font/google` in [layout.tsx](file:///c:/WHACKIEST/src/app/layout.tsx).
-- **Shape & Discipline:** Sharp architectural corners (`2px` status stamps with indicator dots, `4px` cards/buttons), zero gradients, zero emojis (clean stroke SVGs in [Icons.tsx](file:///c:/WHACKIEST/src/components/Icons.tsx)), zero fabricated metrics or customer claims.
+- **Typography:** Self-hosted Google Fonts (`Plus Jakarta Sans` UI copy + `JetBrains Mono` tabular figures and slashed zeros for case IDs, amounts, variances, and SHA-256 hashes) via `next/font/google` in [layout.tsx](../src/app/layout.tsx).
+- **Shape & Discipline:** Sharp architectural corners (`2px` status stamps with indicator dots, `4px` cards/buttons), zero gradients, zero emojis (clean stroke SVGs in [Icons.tsx](../src/components/Icons.tsx)), zero fabricated metrics or customer claims.
 
 ---
 
