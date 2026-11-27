@@ -1,0 +1,60 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+
+# Uploads
+uploads/
+
+# Logs
+logs/
+*.log
+
+# Build output
+.next/
+dist/
+build/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Supervisor logs
+.supervisor/
+
+# GSD state (optional, include if needed)
+# .gsd/
+
+# Agent state
+.agent/
+.agents/
+.code-review-graph/
+
+# Gemini config
+.gemini/
+
+# Other
+gemini-web2api/
+adapters/
+/scripts/
