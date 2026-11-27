@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type {
   ConfidenceAssessment,
   Discrepancy,
+  DocumentType,
   EvidenceGap,
   EvidenceGraphData,
+  ExtractedField,
   FollowUpDraft,
   InvestigationCase,
   InvestigationEvent,
@@ -16,8 +18,8 @@ import type {
   Report,
   VerificationRecord,
 } from '@/core/types';
-import { apiFetch } from '@/lib/api-client';
-import { TopBar, type ClientUser } from './TopBar';
+import { apiFetch, formatMinorMoney } from '@/lib/api-client';
+import { AppShell, TopBar, type ClientUser } from './TopBar';
 import { DocumentsPanel } from './DocumentsPanel';
 import { FieldsVerificationPanel } from './FieldsVerificationPanel';
 import { ReconciliationPanel } from './ReconciliationPanel';
@@ -50,6 +52,38 @@ interface CaseBundle {
   discrepancies: Discrepancy[];
   blockers: PaymentBlocker[];
   graph: EvidenceGraphData | null;
+}
+
+function summarizeDocSide(
+  docType: DocumentType,
+  docs: McpCaseContext['documents'],
+  fields: ExtractedField[]
+) {
+  const matchingDocs = docs.filter((d) => d.documentType === docType);
+  if (matchingDocs.length === 0) {
+    return { present: false, qtyText: 'MISSING RECORD', priceText: '—', badge: 'danger', statusLabel: 'MISSING' };
+  }
+  const docIds = new Set(matchingDocs.map((d) => d.id));
+  const docFields = fields.filter((f) => docIds.has(f.documentId) && f.status !== 'REJECTED');
+  const qtyFields = docFields.filter((f) => f.fieldName === 'quantity' && f.presence === 'PRESENT');
+  const priceField = docFields.find((f) => f.fieldName === 'unit_price' && f.presence === 'PRESENT');
+
+  const qtySum = qtyFields.reduce((acc, f) => acc + (f.numericValue ?? 0), 0);
+  const unit = qtyFields[0]?.unit || 'UNITS';
+  const allVerified =
+    qtyFields.length > 0 && qtyFields.every((f) => f.status === 'VERIFIED' || f.status === 'CORRECTED');
+
+  return {
+    present: true,
+    qtyText: qtyFields.length > 0 ? `${qtySum} ${unit}` : 'QTY MISSING',
+    qtyNumeric: qtyFields.length > 0 ? qtySum : null,
+    priceText:
+      priceField && priceField.numericValue !== null
+        ? `@ ${formatMinorMoney(priceField.numericValue, priceField.currency)} / unit`
+        : `${matchingDocs.length} document(s)`,
+    badge: qtyFields.length === 0 ? 'warn' : allVerified ? 'ok' : 'info',
+    statusLabel: qtyFields.length === 0 ? 'INCOMPLETE' : allVerified ? 'VERIFIED' : 'EXTRACTED',
+  };
 }
 
 export function CaseWorkspace({ caseId }: { caseId: string }) {
@@ -156,41 +190,66 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
   }
 
   const allFields = [...bundle.context.verifiedRecords, ...bundle.context.unverifiedRecords];
+  const poSummary = summarizeDocSide('PURCHASE_ORDER', bundle.context.documents, allFields);
+  const invSummary = summarizeDocSide('INVOICE', bundle.context.documents, allFields);
+  const grnSummary = summarizeDocSide('DELIVERY_RECORD', bundle.context.documents, allFields);
+
+  const qtyDiscrepancy = bundle.discrepancies.find((d) => d.ruleId === 'R-QTY-01');
+  const liveQtyDelta =
+    invSummary.qtyNumeric !== null &&
+    invSummary.qtyNumeric !== undefined &&
+    grnSummary.qtyNumeric !== null &&
+    grnSummary.qtyNumeric !== undefined
+      ? invSummary.qtyNumeric - grnSummary.qtyNumeric
+      : null;
 
   return (
-    <>
-      <TopBar
-        user={user}
-        onLogout={handleLogout}
-        backHref="/"
-        backLabel="All Investigations"
-      />
+    <AppShell
+      user={user}
+      onLogout={handleLogout}
+      activeCaseId={bundle.caseData.id}
+      breadcrumbCurrent={bundle.caseData.caseNumber}
+    >
       <main className="container">
         <div className="card">
-          <div className="row-between">
-            <div>
-              <div className="row">
-                <h2 style={{ margin: 0 }}>{bundle.caseData.caseNumber}</h2>
+          <div className="row-between" style={{ alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: '300px' }}>
+              <div className="row" style={{ marginBottom: '6px' }}>
+                <h1 className="page-title mono" style={{ margin: 0 }}>
+                  {bundle.caseData.caseNumber}
+                </h1>
                 <span className="badge info">{bundle.caseData.status}</span>
                 <span className={`badge ${bundle.eventChain.valid ? 'ok' : 'danger'}`}>
                   Audit Chain: {bundle.eventChain.valid ? 'VALID' : 'BROKEN'}
                 </span>
               </div>
-              <div style={{ fontWeight: 600, marginTop: '4px' }}>{bundle.caseData.title}</div>
+              <div style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text)' }}>
+                {bundle.caseData.title}
+              </div>
               {bundle.caseData.description && (
-                <p className="small muted" style={{ marginBottom: 0 }}>
+                <p className="small muted" style={{ margin: '4px 0 0' }}>
                   {bundle.caseData.description}
                 </p>
               )}
+
+              {bundle.context.parties.length > 0 && (
+                <div className="row" style={{ marginTop: '10px', gap: '8px' }}>
+                  {bundle.context.parties.map((p) => (
+                    <span key={p.id} className="badge">
+                      {p.role}: {p.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="grid-4" style={{ minWidth: '340px' }}>
+            <div className="grid-4" style={{ minWidth: '380px', flex: '0 1 480px' }}>
               <div className="stat-box">
                 <div className="stat-label">Documents</div>
                 <div className="stat-value">{bundle.context.documents.length}</div>
               </div>
               <div className="stat-box">
-                <div className="stat-label">Evidence Coverage</div>
+                <div className="stat-label">Evidence Slots</div>
                 <div className="stat-value">{bundle.coverage.ratioLabel}</div>
               </div>
               <div className="stat-box">
@@ -204,15 +263,74 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
             </div>
           </div>
 
-          {bundle.context.parties.length > 0 && (
-            <div className="row small muted" style={{ marginTop: '10px' }}>
-              {bundle.context.parties.map((p) => (
-                <span key={p.id}>
-                  <strong>{p.role}:</strong> {p.name}
-                </span>
-              ))}
+          {/* 3-Way Match Snapshot built strictly from persisted case records */}
+          <div className="match-matrix" aria-label="3-Way Match Matrix">
+            <div className="match-cell">
+              <div className="match-cell-title">
+                <span>1. Purchase Order</span>
+                <span className={`badge ${poSummary.badge}`}>{poSummary.statusLabel}</span>
+              </div>
+              <div className="match-cell-primary">{poSummary.qtyText}</div>
+              <div className="match-cell-meta">{poSummary.priceText}</div>
             </div>
-          )}
+
+            <div className="match-cell">
+              <div className="match-cell-title">
+                <span>2. Vendor Invoice</span>
+                <span className={`badge ${invSummary.badge}`}>{invSummary.statusLabel}</span>
+              </div>
+              <div className="match-cell-primary">{invSummary.qtyText}</div>
+              <div className="match-cell-meta">{invSummary.priceText}</div>
+            </div>
+
+            <div className="match-cell">
+              <div className="match-cell-title">
+                <span>3. Delivery (GRN)</span>
+                <span className={`badge ${grnSummary.badge}`}>{grnSummary.statusLabel}</span>
+              </div>
+              <div className="match-cell-primary">{grnSummary.qtyText}</div>
+              <div className="match-cell-meta">{grnSummary.priceText}</div>
+            </div>
+
+            <div
+              className={`match-cell ${
+                qtyDiscrepancy || (liveQtyDelta !== null && liveQtyDelta !== 0)
+                  ? 'variance-alert'
+                  : bundle.latestRun
+                    ? 'variance-ok'
+                    : ''
+              }`}
+            >
+              <div className="match-cell-title">
+                <span>4. Quantity Variance</span>
+                {qtyDiscrepancy ? (
+                  <span className="badge danger">{qtyDiscrepancy.ruleId}</span>
+                ) : liveQtyDelta !== null && liveQtyDelta !== 0 ? (
+                  <span className="badge warn">DELTA DETECTED</span>
+                ) : (
+                  <span className="badge">{bundle.latestRun ? 'MATCHED' : 'UNRECONCILED'}</span>
+                )}
+              </div>
+              <div className="match-cell-primary">
+                {qtyDiscrepancy
+                  ? `${qtyDiscrepancy.actualValue} vs ${qtyDiscrepancy.expectedValue}`
+                  : liveQtyDelta !== null
+                    ? liveQtyDelta === 0
+                      ? '0 UNITS'
+                      : `${liveQtyDelta > 0 ? `+${liveQtyDelta}` : liveQtyDelta} UNITS`
+                    : 'Not comparable'}
+              </div>
+              <div className="match-cell-meta">
+                {qtyDiscrepancy && qtyDiscrepancy.varianceValue !== null
+                  ? `Computed illustration: ${formatMinorMoney(qtyDiscrepancy.varianceValue, qtyDiscrepancy.varianceCurrency)}`
+                  : liveQtyDelta !== null && liveQtyDelta !== 0 && !bundle.latestRun
+                    ? 'Open tab 3 to persist MCP reconciliation'
+                    : grnSummary.present
+                      ? 'Persisted deterministic evaluation'
+                      : 'Delivery record missing (R-DLV-01)'}
+              </div>
+            </div>
+          </div>
         </div>
 
         <nav className="tabs" aria-label="Investigation Views">
@@ -322,6 +440,6 @@ export function CaseWorkspace({ caseId }: { caseId: string }) {
           />
         )}
       </main>
-    </>
+    </AppShell>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import type { DocumentType, ExtractedField, SourceDocument } from '@/core/types';
 import { apiFetch } from '@/lib/api-client';
+import { DownloadIcon, FileAuditIcon } from './Icons';
 
 interface DocumentsPanelProps {
   caseId: string;
@@ -56,18 +57,26 @@ export function DocumentsPanel({ caseId, documents, onRefresh }: DocumentsPanelP
   return (
     <div>
       <div className="card">
-        <h3>Upload Source Document</h3>
-        <p className="small muted">
-          Accepted formats: PDF, PNG, JPG/JPEG, CSV, TXT (max 10 MB). Files are magic-byte verified,
-          hashed (SHA-256), and stored outside the web root.
-        </p>
+        <div className="card-header">
+          <div>
+            <div className="row" style={{ marginBottom: '4px' }}>
+              <FileAuditIcon size={15} />
+              <h3 style={{ margin: 0 }}>Upload Source Document</h3>
+            </div>
+            <p className="small muted" style={{ margin: 0 }}>
+              Accepted formats: PDF, PNG, JPG/JPEG, CSV, TXT (max 10 MB). Files are magic-byte verified,
+              hashed (SHA-256), and stored outside the web root.
+            </p>
+          </div>
+          <span className="badge ok">Magic-Byte &amp; SHA-256 Verified</span>
+        </div>
 
         {error && <div className="alert error">{error}</div>}
         {notice && <div className="alert info">{notice}</div>}
 
-        <form onSubmit={handleUpload} className="row" style={{ alignItems: 'flex-end' }}>
+        <form onSubmit={handleUpload} className="upload-zone row" style={{ alignItems: 'flex-end' }}>
           <div className="field-group">
-            <label htmlFor="doc-type-select">Document Type</label>
+            <label htmlFor="doc-type-select">Document Classification</label>
             <select
               id="doc-type-select"
               value={docType}
@@ -80,8 +89,8 @@ export function DocumentsPanel({ caseId, documents, onRefresh }: DocumentsPanelP
             </select>
           </div>
 
-          <div className="field-group" style={{ flex: 1, minWidth: '220px' }}>
-            <label htmlFor="doc-file-input">File</label>
+          <div className="field-group" style={{ flex: 1, minWidth: '240px' }}>
+            <label htmlFor="doc-file-input">Source Artifact File</label>
             <input
               id="doc-file-input"
               type="file"
@@ -97,40 +106,44 @@ export function DocumentsPanel({ caseId, documents, onRefresh }: DocumentsPanelP
       </div>
 
       <div className="card">
-        <h3>Preserved Source Documents ({documents.length})</h3>
+        <div className="card-header">
+          <h3 style={{ margin: 0 }}>Preserved Source Documents ({documents.length})</h3>
+          <span className="badge info">Immutable Originals</span>
+        </div>
         {documents.length === 0 ? (
-          <p className="muted">No source documents uploaded yet for this investigation.</p>
+          <p className="muted" style={{ margin: 0 }}>No source documents uploaded yet for this investigation.</p>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Type</th>
-                  <th>Filename</th>
+                  <th>Document Type</th>
+                  <th>Original Filename</th>
                   <th>MIME / Size</th>
-                  <th>SHA-256</th>
-                  <th>Uploaded At</th>
-                  <th>Original File</th>
+                  <th>SHA-256 Digest</th>
+                  <th>Uploaded Timestamp</th>
+                  <th className="text-right">Original File</th>
                 </tr>
               </thead>
               <tbody>
                 {documents.map((doc) => (
                   <tr key={doc.id}>
                     <td>
-                      <span className="badge">{doc.documentType}</span>
+                      <span className="badge info">{doc.documentType}</span>
                     </td>
-                    <td>{doc.originalFilename}</td>
-                    <td className="small muted">
-                      {doc.mimeType} ({doc.sizeBytes} B)
+                    <td style={{ fontWeight: 600 }}>{doc.originalFilename}</td>
+                    <td className="mono small muted">
+                      {doc.mimeType} • {doc.sizeBytes.toLocaleString()} B
                     </td>
-                    <td className="mono">{doc.sha256.slice(0, 16)}…</td>
-                    <td className="small muted">{doc.uploadedAt}</td>
-                    <td>
+                    <td className="mono small">{doc.sha256.slice(0, 18)}…</td>
+                    <td className="mono small muted">{doc.uploadedAt}</td>
+                    <td className="text-right">
                       <a
                         className="btn small"
                         href={`/api/v1/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(doc.id)}/download`}
                       >
-                        Download
+                        <DownloadIcon size={13} />
+                        <span>Download</span>
                       </a>
                     </td>
                   </tr>

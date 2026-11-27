@@ -11,6 +11,7 @@ import type {
   UserRole,
 } from '@/core/types';
 import { apiFetch, formatMinorMoney } from '@/lib/api-client';
+import { AlertIcon, TerminalIcon } from './Icons';
 
 interface ReconciliationPanelProps {
   caseId: string;
@@ -93,6 +94,9 @@ export function ReconciliationPanel({
     return '';
   };
 
+  const coveragePct =
+    coverage.total > 0 ? Math.min(100, Math.round((coverage.verified / coverage.total) * 100)) : 0;
+
   return (
     <div>
       {error && <div className="alert error">{error}</div>}
@@ -101,8 +105,11 @@ export function ReconciliationPanel({
       <div className="card">
         <div className="row-between">
           <div>
-            <h3>Deterministic Reconciliation (MCP-Backed)</h3>
-            <p className="small muted">
+            <div className="row" style={{ marginBottom: '4px' }}>
+              <TerminalIcon size={15} />
+              <h3 style={{ margin: 0 }}>Deterministic Reconciliation (MCP-Backed)</h3>
+            </div>
+            <p className="small muted" style={{ margin: 0 }}>
               Executes <code className="mono">reconcile_case_records</code>,{' '}
               <code className="mono">detect_evidence_gaps</code>, and{' '}
               <code className="mono">assess_payment_blockers</code> through the stdio MCP server.
@@ -114,22 +121,38 @@ export function ReconciliationPanel({
         </div>
 
         {latestRun ? (
-          <div className="small muted" style={{ marginTop: '8px' }}>
-            Latest Run: <code className="mono">{latestRun.id}</code> | Rules:{' '}
-            <code className="mono">{latestRun.rulesVersion}</code> | Input Snapshot Hash:{' '}
-            <code className="mono">{latestRun.inputSnapshotHash.slice(0, 16)}…</code>
+          <div className="row small muted" style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+            <span>
+              Run ID: <code className="mono">{latestRun.id}</code>
+            </span>
+            <span>|</span>
+            <span>
+              Rules: <code className="mono">{latestRun.rulesVersion}</code>
+            </span>
+            <span>|</span>
+            <span>
+              Input Hash: <code className="mono">{latestRun.inputSnapshotHash.slice(0, 16)}…</code>
+            </span>
           </div>
         ) : (
-          <div className="alert warn" style={{ marginTop: '12px' }}>
+          <div className="alert warn" style={{ marginTop: '12px', marginBottom: 0 }}>
             No reconciliation run persisted yet. Click &ldquo;Run MCP Reconciliation&rdquo; to evaluate records.
           </div>
         )}
       </div>
 
       <div className="card">
-        <h3>Discrepancies ({discrepancies.length})</h3>
+        <div className="card-header">
+          <div className="row">
+            <AlertIcon size={15} />
+            <h3 style={{ margin: 0 }}>Discrepancies ({discrepancies.length})</h3>
+          </div>
+          {discrepancies.length > 0 && <span className="badge danger">Exceptions Flagged</span>}
+        </div>
         {discrepancies.length === 0 ? (
-          <p className="muted">No discrepancies detected in the latest reconciliation run.</p>
+          <p className="muted" style={{ margin: 0 }}>
+            No discrepancies detected in the latest reconciliation run.
+          </p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -137,36 +160,46 @@ export function ReconciliationPanel({
                 <tr>
                   <th>Rule</th>
                   <th>Type</th>
-                  <th>Description</th>
+                  <th>Explanation</th>
                   <th>Expected vs Actual</th>
-                  <th>Computed Variance Illustration</th>
+                  <th>Computed Illustration</th>
                   <th>Confidence</th>
                   <th>Sources</th>
                 </tr>
               </thead>
               <tbody>
                 {discrepancies.map((d) => (
-                  <tr key={d.id}>
-                    <td className="mono">{d.ruleId}</td>
+                  <tr key={d.id} className="row-highlight">
+                    <td className="mono">
+                      <strong>{d.ruleId}</strong>
+                    </td>
                     <td>
                       <span className="badge danger">{d.discrepancyType}</span>
                     </td>
                     <td>{d.description}</td>
-                    <td className="small">
-                      Expected: <strong>{d.expectedValue ?? '—'}</strong>
-                      <br />
-                      Actual: <strong>{d.actualValue ?? '—'}</strong>
+                    <td className="small num">
+                      <div>
+                        <span className="muted">Expected:</span> <strong>{d.expectedValue ?? '—'}</strong>
+                      </div>
+                      <div>
+                        <span className="muted">Actual:</span> <strong>{d.actualValue ?? '—'}</strong>
+                      </div>
                     </td>
-                    <td className="small">
-                      {d.varianceValue !== null
-                        ? `${formatMinorMoney(d.varianceValue, d.varianceCurrency)} (computed illustration only)`
-                        : '—'}
+                    <td className="small num">
+                      {d.varianceValue !== null ? (
+                        <div>
+                          <strong>{formatMinorMoney(d.varianceValue, d.varianceCurrency)}</strong>
+                          <div className="muted">computed illustration only</div>
+                        </div>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td>
                       <span className={`badge ${confidenceBadge(d.confidence)}`}>{d.confidence}</span>
                     </td>
                     <td className="mono small">
-                      Docs: {d.sourceDocumentIds.length}, Fields: {d.sourceFieldIds.length}
+                      Docs: {d.sourceDocumentIds.length} • Fields: {d.sourceFieldIds.length}
                     </td>
                   </tr>
                 ))}
@@ -177,26 +210,40 @@ export function ReconciliationPanel({
       </div>
 
       <div className="card">
-        <div className="row-between">
-          <h3>Evidence Gaps &amp; Coverage ({coverage.ratioLabel})</h3>
+        <div className="card-header">
+          <div>
+            <h3 style={{ margin: 0 }}>Evidence Gaps &amp; Coverage</h3>
+            <div className="small muted">
+              Bounded slot completeness across required case evidence documents &amp; mandatory fields
+            </div>
+          </div>
           <span className="badge info">
-            Verified Slots: {coverage.verified} / {coverage.total}
+            {coverage.ratioLabel} ({coverage.verified} / {coverage.total} verified)
           </span>
         </div>
 
+        <div className="progress-track" aria-label={`Evidence coverage ${coveragePct}%`}>
+          <div className="progress-fill" style={{ width: `${coveragePct}%` }} />
+        </div>
+
         {confidenceAssessments.length > 0 && (
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ marginBottom: '12px', display: 'grid', gap: '6px' }}>
             {confidenceAssessments.map((ca) => (
-              <div key={ca.id} className="small" style={{ marginBottom: '4px' }}>
-                <span className={`badge ${confidenceBadge(ca.level)}`}>{ca.level}</span>{' '}
-                {ca.criteria} ({ca.inputFieldsVerified}/{ca.inputFieldsTotal} verified inputs)
+              <div key={ca.id} className="stat-box row-between" style={{ padding: '8px 10px' }}>
+                <div className="row small">
+                  <span className={`badge ${confidenceBadge(ca.level)}`}>{ca.level}</span>
+                  <span>{ca.criteria}</span>
+                </div>
+                <span className="mono small muted">
+                  {ca.inputFieldsVerified}/{ca.inputFieldsTotal} verified inputs
+                </span>
               </div>
             ))}
           </div>
         )}
 
         {gaps.length === 0 ? (
-          <p className="muted">No open evidence gaps.</p>
+          <p className="muted" style={{ margin: 0 }}>No open evidence gaps.</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -215,7 +262,7 @@ export function ReconciliationPanel({
                     <td>
                       <span className="badge warn">{g.ruleId ?? g.gapType}</span>
                     </td>
-                    <td>{g.whatIsMissing}</td>
+                    <td style={{ fontWeight: 500 }}>{g.whatIsMissing}</td>
                     <td className="small">{g.whyItMatters}</td>
                     <td className="small">{g.affectedConclusions}</td>
                     <td className="small">{g.whatCouldResolve}</td>
@@ -228,20 +275,26 @@ export function ReconciliationPanel({
       </div>
 
       <div className="card">
-        <h3>Advisory Payment Blockers ({blockers.length})</h3>
-        <p className="small muted">
-          Advisory only — PROOFLYN never auto-executes or rejects payments. Only a REVIEWER may
-          acknowledge or resolve blockers.
-        </p>
+        <div className="card-header">
+          <div>
+            <h3 style={{ margin: 0 }}>Advisory Payment Blockers ({blockers.length})</h3>
+            <p className="small muted" style={{ margin: '2px 0 0' }}>
+              Advisory only — PROOFLYN never auto-executes or rejects payments. Only a REVIEWER may
+              acknowledge or resolve blockers.
+            </p>
+          </div>
+          <span className="badge">{userRole}</span>
+        </div>
+
         {blockers.length === 0 ? (
-          <p className="muted">No payment blockers recorded.</p>
+          <p className="muted" style={{ margin: 0 }}>No payment blockers recorded.</p>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Rule</th>
-                  <th>Blocker</th>
+                  <th>Blocker &amp; Evidence Refs</th>
                   <th>Reason &amp; Impact</th>
                   <th>Resolution Required</th>
                   <th>Status</th>
@@ -250,8 +303,10 @@ export function ReconciliationPanel({
               </thead>
               <tbody>
                 {blockers.map((b) => (
-                  <tr key={b.id}>
-                    <td className="mono">{b.ruleId}</td>
+                  <tr key={b.id} className={b.status === 'OPEN' ? 'row-highlight' : undefined}>
+                    <td className="mono">
+                      <strong>{b.ruleId}</strong>
+                    </td>
                     <td>
                       <strong>{b.title}</strong>
                       <div className="mono small muted">{b.evidenceReferences.join(', ')}</div>
@@ -275,6 +330,7 @@ export function ReconciliationPanel({
                         <div className="row">
                           <button
                             type="button"
+                            className="small"
                             disabled={blockerBusyId === b.id || b.status === 'ACKNOWLEDGED'}
                             onClick={() => handleBlockerStatus(b.id, 'ACKNOWLEDGED')}
                           >
@@ -282,6 +338,7 @@ export function ReconciliationPanel({
                           </button>
                           <button
                             type="button"
+                            className="small primary"
                             disabled={blockerBusyId === b.id || b.status === 'RESOLVED'}
                             onClick={() => handleBlockerStatus(b.id, 'RESOLVED')}
                           >

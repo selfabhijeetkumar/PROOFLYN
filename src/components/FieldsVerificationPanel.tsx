@@ -9,6 +9,7 @@ import type {
   VerificationRecord,
 } from '@/core/types';
 import { apiFetch, formatMinorMoney } from '@/lib/api-client';
+import { CheckCircleIcon } from './Icons';
 
 interface FieldsVerificationPanelProps {
   caseId: string;
@@ -17,6 +18,8 @@ interface FieldsVerificationPanelProps {
   verifications: VerificationRecord[];
   onRefresh: () => Promise<void>;
 }
+
+type FieldFilter = 'ALL' | 'VERIFIED' | 'EXTRACTED' | 'NEEDS_REVIEW' | 'MISSING';
 
 export function FieldsVerificationPanel({
   caseId,
@@ -29,6 +32,7 @@ export function FieldsVerificationPanel({
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [correctValue, setCorrectValue] = useState('');
   const [correctReason, setCorrectReason] = useState('');
+  const [filter, setFilter] = useState<FieldFilter>('ALL');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -108,10 +112,10 @@ export function FieldsVerificationPanel({
     }
   };
 
-  const badgeClass = (status: ExtractedField['status']) => {
-    if (status === 'VERIFIED' || status === 'CORRECTED') return 'ok';
-    if (status === 'REJECTED') return 'danger';
-    if (status === 'NEEDS_REVIEW') return 'warn';
+  const badgeClass = (f: ExtractedField) => {
+    if (f.presence !== 'PRESENT' || f.status === 'REJECTED') return 'danger';
+    if (f.status === 'VERIFIED' || f.status === 'CORRECTED') return 'ok';
+    if (f.status === 'NEEDS_REVIEW') return 'warn';
     return 'info';
   };
 
@@ -123,52 +127,116 @@ export function FieldsVerificationPanel({
     return `${f.extractedValue ?? '—'}${f.unit ? ` ${f.unit}` : ''}`;
   };
 
+  const verifiedCount = fields.filter((f) => f.status === 'VERIFIED' || f.status === 'CORRECTED').length;
+  const extractedCount = fields.filter((f) => f.status === 'EXTRACTED').length;
+  const needsReviewCount = fields.filter((f) => f.status === 'NEEDS_REVIEW').length;
+  const missingOrRejectedCount = fields.filter((f) => f.presence !== 'PRESENT' || f.status === 'REJECTED').length;
+
+  const filteredFields = fields.filter((f) => {
+    if (filter === 'VERIFIED') return f.status === 'VERIFIED' || f.status === 'CORRECTED';
+    if (filter === 'EXTRACTED') return f.status === 'EXTRACTED';
+    if (filter === 'NEEDS_REVIEW') return f.status === 'NEEDS_REVIEW';
+    if (filter === 'MISSING') return f.presence !== 'PRESENT' || f.status === 'REJECTED';
+    return true;
+  });
+
   return (
     <div>
       {error && <div className="alert error">{error}</div>}
       {notice && <div className="alert ok">{notice}</div>}
 
       <div className="card">
-        <h3>Extracted vs Verified Fields ({fields.length})</h3>
-        <p className="small muted">
-          Extracted values are never treated as verified until a human confirms or corrects them.
-          Original raw extracted text is always preserved alongside verification history.
-        </p>
+        <div className="card-header">
+          <div>
+            <div className="row" style={{ marginBottom: '4px' }}>
+              <CheckCircleIcon size={15} />
+              <h3 style={{ margin: 0 }}>Extracted vs Verified Fields ({fields.length})</h3>
+            </div>
+            <p className="small muted" style={{ margin: 0 }}>
+              Extracted values are never treated as verified until a human confirms or corrects them.
+              Original raw text is preserved alongside append-only verification history.
+            </p>
+          </div>
+          <div className="row">
+            <span className="badge ok">Verified: {verifiedCount}</span>
+            <span className="badge info">Extracted: {extractedCount}</span>
+            <span className="badge warn">Needs Review: {needsReviewCount}</span>
+            {missingOrRejectedCount > 0 && (
+              <span className="badge danger">Missing/Rejected: {missingOrRejectedCount}</span>
+            )}
+          </div>
+        </div>
 
-        {fields.length === 0 ? (
-          <p className="muted">No extracted fields yet. Upload a document or add a manual field below.</p>
+        <div className="row" style={{ marginBottom: '12px' }}>
+          <button type="button" className={`small ${filter === 'ALL' ? 'primary' : ''}`} onClick={() => setFilter('ALL')}>
+            All ({fields.length})
+          </button>
+          <button type="button" className={`small ${filter === 'VERIFIED' ? 'primary' : ''}`} onClick={() => setFilter('VERIFIED')}>
+            Verified ({verifiedCount})
+          </button>
+          <button type="button" className={`small ${filter === 'EXTRACTED' ? 'primary' : ''}`} onClick={() => setFilter('EXTRACTED')}>
+            Extracted ({extractedCount})
+          </button>
+          <button type="button" className={`small ${filter === 'NEEDS_REVIEW' ? 'primary' : ''}`} onClick={() => setFilter('NEEDS_REVIEW')}>
+            Needs Review ({needsReviewCount})
+          </button>
+          <button type="button" className={`small ${filter === 'MISSING' ? 'primary' : ''}`} onClick={() => setFilter('MISSING')}>
+            Missing / Rejected ({missingOrRejectedCount})
+          </button>
+        </div>
+
+        {filteredFields.length === 0 ? (
+          <p className="muted" style={{ margin: 0 }}>
+            {fields.length === 0
+              ? 'No extracted fields yet. Upload a document or add a manual field below.'
+              : 'No fields match the selected verification filter.'}
+          </p>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Document</th>
+                  <th>Source Document</th>
                   <th>Field</th>
                   <th>Raw Extracted</th>
                   <th>Current Value</th>
                   <th>Method / Loc</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>Verification State</th>
+                  <th>Review Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {fields.map((f) => (
-                  <tr key={f.id}>
+                {filteredFields.map((f) => (
+                  <tr
+                    key={f.id}
+                    className={
+                      f.presence !== 'PRESENT' || f.status === 'NEEDS_REVIEW'
+                        ? 'row-highlight'
+                        : undefined
+                    }
+                  >
                     <td className="small">{docNameById.get(f.documentId) ?? f.documentId}</td>
-                    <td className="mono">{f.fieldName}</td>
-                    <td className="small muted">{f.rawText ?? '—'}</td>
-                    <td>{displayValue(f)}</td>
-                    <td className="small muted">
+                    <td className="mono">
+                      <strong>{f.fieldName}</strong>
+                    </td>
+                    <td className="mono small muted">{f.rawText ?? '—'}</td>
+                    <td className="num" style={{ fontWeight: 600 }}>
+                      {displayValue(f)}
+                    </td>
+                    <td className="mono small muted">
                       {f.extractionMethod}
                       {f.sourceOffset ? ` (${f.sourceOffset})` : ''}
                     </td>
                     <td>
-                      <span className={`badge ${badgeClass(f.status)}`}>{f.status}</span>
+                      <span className={`badge ${badgeClass(f)}`}>
+                        {f.presence !== 'PRESENT' ? f.presence : f.status}
+                      </span>
                     </td>
                     <td>
                       <div className="row">
                         <button
                           type="button"
+                          className="small primary"
                           disabled={busyId === f.id || f.presence !== 'PRESENT'}
                           onClick={() => runVerifyAction(f, 'VERIFY', 'Human confirmed against source document')}
                         >
@@ -176,6 +244,7 @@ export function FieldsVerificationPanel({
                         </button>
                         <button
                           type="button"
+                          className="small"
                           disabled={busyId === f.id}
                           onClick={() => {
                             setEditingFieldId(editingFieldId === f.id ? null : f.id);
@@ -187,7 +256,7 @@ export function FieldsVerificationPanel({
                         </button>
                         <button
                           type="button"
-                          className="danger"
+                          className="small danger"
                           disabled={busyId === f.id}
                           onClick={() => runVerifyAction(f, 'REJECT', 'Rejected as invalid or irrelevant extraction')}
                         >
@@ -195,7 +264,15 @@ export function FieldsVerificationPanel({
                         </button>
                       </div>
                       {editingFieldId === f.id && (
-                        <div style={{ marginTop: '8px', padding: '8px', background: 'var(--surface-muted)', borderRadius: '4px' }}>
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            padding: '10px',
+                            background: 'var(--surface-subtle)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                          }}
+                        >
                           <div className="form-grid">
                             <input
                               type="text"
@@ -212,13 +289,13 @@ export function FieldsVerificationPanel({
                             <div className="row">
                               <button
                                 type="button"
-                                className="primary"
+                                className="small primary"
                                 disabled={busyId === f.id || !correctValue.trim() || correctReason.trim().length < 2}
                                 onClick={() => runVerifyAction(f, 'CORRECT', correctReason, correctValue)}
                               >
                                 Save Correction
                               </button>
-                              <button type="button" onClick={() => setEditingFieldId(null)}>
+                              <button type="button" className="small" onClick={() => setEditingFieldId(null)}>
                                 Cancel
                               </button>
                             </div>
@@ -235,7 +312,15 @@ export function FieldsVerificationPanel({
       </div>
 
       <div className="card">
-        <h3>Manual Field Entry (Always Available Fallback)</h3>
+        <div className="card-header">
+          <div>
+            <h3 style={{ margin: 0 }}>Manual Field Entry (Always Available Fallback)</h3>
+            <p className="small muted" style={{ margin: '2px 0 0' }}>
+              Record human-read evidence fields directly when scanned images or partial documents lack parseable text.
+            </p>
+          </div>
+          <span className="badge info">Method: MANUAL</span>
+        </div>
         <form onSubmit={handleManualAdd} className="row" style={{ alignItems: 'flex-end' }}>
           <div className="field-group">
             <label htmlFor="manual-doc">Source Document</label>
@@ -314,9 +399,12 @@ export function FieldsVerificationPanel({
       </div>
 
       <div className="card">
-        <h3>Append-Only Verification Audit Records ({verifications.length})</h3>
+        <div className="card-header">
+          <h3 style={{ margin: 0 }}>Append-Only Verification Audit Records ({verifications.length})</h3>
+          <span className="badge">Immutable Trail</span>
+        </div>
         {verifications.length === 0 ? (
-          <p className="muted">No human verification actions recorded yet.</p>
+          <p className="muted" style={{ margin: 0 }}>No human verification actions recorded yet.</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -333,16 +421,17 @@ export function FieldsVerificationPanel({
               <tbody>
                 {verifications.map((v) => (
                   <tr key={v.id}>
-                    <td className="small muted">{v.createdAt}</td>
+                    <td className="mono small muted">{v.createdAt}</td>
                     <td className="mono">{v.extractedFieldId.slice(0, 12)}</td>
                     <td className="small">
-                      {v.previousStatus} → {v.newStatus}
+                      <span className="badge">{v.previousStatus}</span> →{' '}
+                      <span className="badge ok">{v.newStatus}</span>
                     </td>
-                    <td className="small">
+                    <td className="mono small">
                       {v.previousValue ?? 'null'} → {v.newValue ?? 'null'}
                     </td>
-                    <td className="mono">{v.verifiedBy}</td>
-                    <td>{v.reason}</td>
+                    <td className="mono small">{v.verifiedBy}</td>
+                    <td className="small">{v.reason}</td>
                   </tr>
                 ))}
               </tbody>

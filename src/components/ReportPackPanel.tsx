@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { FollowUpDraft, Report } from '@/core/types';
 import type { ReportContent } from '@/core/report-builder';
 import { apiFetch } from '@/lib/api-client';
+import { DownloadIcon, FileAuditIcon } from './Icons';
 
 interface ReportPackPanelProps {
   caseId: string;
@@ -82,10 +83,15 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
       {notice && <div className="alert ok">{notice}</div>}
 
       <div className="card">
-        <div className="row-between">
+        <div className="card-header">
           <div>
-            <h3>Dispute-Ready Evidence Pack (MCP <code className="mono">generate_evidence_report</code>)</h3>
-            <p className="small muted">
+            <div className="row" style={{ marginBottom: '4px' }}>
+              <FileAuditIcon size={15} />
+              <h3 style={{ margin: 0 }}>
+                Dispute-Ready Evidence Pack (MCP <code className="mono">generate_evidence_report</code>)
+              </h3>
+            </div>
+            <p className="small muted" style={{ margin: 0 }}>
               Immutable snapshot grounded strictly in persisted records, SHA-256 document hashes,
               reconciliation findings, gaps, blockers, timeline, and MCP tool-call evidence.
             </p>
@@ -96,7 +102,7 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
         </div>
 
         {reports.length > 0 && (
-          <div className="row" style={{ marginTop: '12px' }}>
+          <div className="row">
             <label htmlFor="report-select" className="small muted">Snapshot:</label>
             <select
               id="report-select"
@@ -112,18 +118,20 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
             {activeReport && (
               <>
                 <a
-                  className="btn"
+                  className="btn small"
                   href={`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${encodeURIComponent(activeReport.id)}/download?format=json`}
                 >
-                  Download JSON
+                  <DownloadIcon size={13} />
+                  <span>Download JSON</span>
                 </a>
                 <a
-                  className="btn"
+                  className="btn small primary"
                   href={`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${encodeURIComponent(activeReport.id)}/download?format=html`}
                 >
-                  Download HTML
+                  <DownloadIcon size={13} />
+                  <span>Download HTML</span>
                 </a>
-                <button type="button" onClick={handleCreateDraft} disabled={creatingDraft}>
+                <button type="button" className="small" onClick={handleCreateDraft} disabled={creatingDraft}>
                   {creatingDraft ? 'Saving Draft...' : 'Create Follow-Up Draft'}
                 </button>
               </>
@@ -134,19 +142,40 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
 
       {!parsedContent ? (
         <div className="card">
-          <p className="muted">
-            No report snapshot generated yet. Click &ldquo;Generate Evidence Pack&rdquo; above.
+          <p className="muted" style={{ margin: 0 }}>
+            No report snapshot generated yet. Click &ldquo;Generate Evidence Pack&rdquo; above to produce an immutable pack.
           </p>
         </div>
       ) : (
         <div className="card">
-          <h3>{parsedContent.title}</h3>
-          <p className="small muted">
-            Snapshot Hash: <code className="mono">{activeReport?.snapshotHash}</code> | Overall
-            Confidence: <strong>{parsedContent.summary.overallConfidence}</strong> | Graph:{' '}
-            {parsedContent.evidenceRelationships.nodeCount} nodes /{' '}
-            {parsedContent.evidenceRelationships.edgeCount} edges
-          </p>
+          <div className="card-header">
+            <div>
+              <h3 style={{ margin: 0 }}>{parsedContent.title}</h3>
+              <div className="mono small muted" style={{ marginTop: '4px' }}>
+                Snapshot SHA-256: {activeReport?.snapshotHash}
+              </div>
+            </div>
+            <span className="badge info">Confidence: {parsedContent.summary.overallConfidence}</span>
+          </div>
+
+          <div className="grid-4" style={{ marginBottom: '16px' }}>
+            <div className="stat-box">
+              <div className="stat-label">Documents</div>
+              <div className="stat-value">{parsedContent.documents.length}</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-label">Discrepancies</div>
+              <div className="stat-value">{parsedContent.reconciliationResults.discrepancies.length}</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-label">Evidence Gaps</div>
+              <div className="stat-value">{parsedContent.evidenceGaps.length}</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-label">MCP Appendix Calls</div>
+              <div className="stat-value">{parsedContent.mcpEvidence.length}</div>
+            </div>
+          </div>
 
           <div className="alert info">
             <strong>Disclaimer:</strong> {parsedContent.disclaimer}
@@ -159,14 +188,16 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
                 <tr>
                   <th>Type</th>
                   <th>Filename</th>
-                  <th>SHA-256</th>
+                  <th>SHA-256 Digest</th>
                 </tr>
               </thead>
               <tbody>
                 {parsedContent.documents.map((d) => (
                   <tr key={d.id}>
-                    <td>{d.type}</td>
-                    <td>{d.filename}</td>
+                    <td>
+                      <span className="badge">{d.type}</span>
+                    </td>
+                    <td style={{ fontWeight: 500 }}>{d.filename}</td>
                     <td className="mono small">{d.sha256}</td>
                   </tr>
                 ))}
@@ -174,9 +205,7 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
             </table>
           </div>
 
-          <h4 style={{ marginTop: '16px' }}>
-            2. Extracted vs Verified Values ({parsedContent.extractedVsVerified.length})
-          </h4>
+          <h4>2. Extracted vs Verified Values ({parsedContent.extractedVsVerified.length})</h4>
           <div className="table-wrap">
             <table>
               <thead>
@@ -193,10 +222,12 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
                   <tr key={idx}>
                     <td>{ev.documentType}</td>
                     <td className="mono">{ev.fieldName}</td>
-                    <td>{ev.extractedValue ?? '—'}</td>
-                    <td>{ev.verifiedValue ?? '—'}</td>
+                    <td className="num">{ev.extractedValue ?? '—'}</td>
+                    <td className="num">{ev.verifiedValue ?? '—'}</td>
                     <td>
-                      <span className="badge">{ev.status}</span>
+                      <span className={`badge ${ev.status === 'VERIFIED' || ev.status === 'CORRECTED' ? 'ok' : 'warn'}`}>
+                        {ev.status}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -204,21 +235,19 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
             </table>
           </div>
 
-          <h4 style={{ marginTop: '16px' }}>
-            3. Reconciliation Discrepancies ({parsedContent.reconciliationResults.discrepancies.length})
-          </h4>
+          <h4>3. Reconciliation Discrepancies ({parsedContent.reconciliationResults.discrepancies.length})</h4>
           {parsedContent.reconciliationResults.discrepancies.length === 0 ? (
             <p className="small muted">None</p>
           ) : (
-            <ul>
+            <div className="form-grid" style={{ gap: '8px' }}>
               {parsedContent.reconciliationResults.discrepancies.map((d, idx) => (
-                <li key={idx} className="small" style={{ marginBottom: '6px' }}>
+                <div key={idx} className="alert error" style={{ marginBottom: 0 }}>
                   <code className="mono">[{d.ruleId}]</code> <strong>{d.type}</strong> ({d.confidence}):{' '}
                   {d.description}
                   {d.varianceDisplay ? ` — ${d.varianceDisplay}` : ''}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
 
           <h4>4. Evidence Gaps ({parsedContent.evidenceGaps.length})</h4>
@@ -267,8 +296,7 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
           </ul>
 
           <h4>8. MCP Evidence Appendix ({parsedContent.mcpEvidence.length} calls)</h4>
-          <p className="small muted">
-            Verified MCP calls recorded in snapshot:{' '}
+          <p className="small mono muted">
             {parsedContent.mcpEvidence
               .map((m) => `${m.toolName} (${m.status}, ${m.durationMs}ms)`)
               .join(' | ') || 'None'}
@@ -277,16 +305,19 @@ export function ReportPackPanel({ caseId, reports, drafts, onRefresh }: ReportPa
       )}
 
       <div className="card">
-        <h3>Follow-Up Drafts ({drafts.length}) — Draft Only, Never Auto-Sent</h3>
+        <div className="card-header">
+          <h3 style={{ margin: 0 }}>Follow-Up Drafts ({drafts.length})</h3>
+          <span className="badge warn">Draft Only — Never Auto-Sent</span>
+        </div>
         {drafts.length === 0 ? (
-          <p className="muted">No follow-up drafts saved yet.</p>
+          <p className="muted" style={{ margin: 0 }}>No follow-up drafts saved yet.</p>
         ) : (
           drafts.map((d) => (
             <div key={d.id} className="stat-box" style={{ marginBottom: '8px' }}>
-              <div className="small muted">
-                Draft <code className="mono">{d.id}</code> | Created {d.createdAt}
+              <div className="mono small muted" style={{ marginBottom: '6px' }}>
+                Draft {d.id} • Created {d.createdAt}
               </div>
-              <ul>
+              <ul style={{ margin: 0, paddingLeft: '18px' }}>
                 {d.questions.map((q, i) => (
                   <li key={i} className="small">
                     {q}

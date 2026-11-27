@@ -4,15 +4,23 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import type { InvestigationCase } from '@/core/types';
 import { apiFetch } from '@/lib/api-client';
-import { TopBar, type ClientUser } from '@/components/TopBar';
+import { AppShell, TopBar, type ClientUser } from '@/components/TopBar';
+import { AlertIcon, ArrowRightIcon, FolderLedgerIcon } from '@/components/Icons';
+
+function caseStatusTone(status: InvestigationCase['status']): string {
+  if (status === 'RECONCILED' || status === 'REPORT_GENERATED' || status === 'CLOSED') return 'ok';
+  if (status === 'UNDER_REVIEW' || status === 'EXTRACTION_COMPLETE') return 'warn';
+  return 'info';
+}
 
 export default function DashboardPage() {
   const [user, setUser] = useState<ClientUser | null>(null);
   const [cases, setCases] = useState<InvestigationCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Login form state
+  // Login form state (shown when demo mode is off or after clicking Sign Out)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
@@ -107,7 +115,7 @@ export default function DashboardPage() {
       <>
         <TopBar user={null} />
         <main className="container">
-          <div className="card">Checking session...</div>
+          <div className="card">Loading PROOFLYN Investigation Ledger...</div>
         </main>
       </>
     );
@@ -117,9 +125,16 @@ export default function DashboardPage() {
     return (
       <>
         <TopBar user={null} />
-        <main className="container" style={{ maxWidth: '520px' }}>
+        <main className="container-narrow">
           <div className="card">
-            <h2>Sign In to PROOFLYN</h2>
+            <div className="card-header">
+              <div>
+                <h2 style={{ marginBottom: '2px' }}>Sign In to PROOFLYN</h2>
+                <p className="small muted" style={{ margin: 0 }}>
+                  Enterprise Dispute Evidence &amp; Reconciliation Workbench
+                </p>
+              </div>
+            </div>
             <p className="small muted">
               Sign in with a seeded Investigator or Reviewer account configured via environment
               variables (<code className="mono">DEMO_INVESTIGATOR_EMAIL</code> /{' '}
@@ -163,39 +178,116 @@ export default function DashboardPage() {
   const reviewCount = cases.filter(
     (c) => c.status === 'EXTRACTION_COMPLETE' || c.status === 'UNDER_REVIEW'
   ).length;
+  const inv1047 = cases.find((c) => c.caseNumber === 'INV-1047');
+
+  const query = searchQuery.trim().toLowerCase();
+  const filteredCases = query
+    ? cases.filter(
+        (c) =>
+          c.caseNumber.toLowerCase().includes(query) ||
+          c.title.toLowerCase().includes(query) ||
+          (c.description && c.description.toLowerCase().includes(query))
+      )
+    : cases;
 
   return (
-    <>
-      <TopBar user={user} onLogout={handleLogout} />
+    <AppShell user={user} onLogout={handleLogout} breadcrumbCurrent="Investigation Ledger">
       <main className="container">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Investigation &amp; 3-Way Dispute Ledger</h1>
+            <p className="page-desc">
+              Deterministic Purchase Order, Invoice, and Delivery reconciliation backed by real stdio MCP verification.
+            </p>
+          </div>
+          {inv1047 && (
+            <Link href={`/cases/${encodeURIComponent(inv1047.id)}`} className="btn primary">
+              <span>Inspect Golden Case INV-1047</span>
+              <ArrowRightIcon size={14} />
+            </Link>
+          )}
+        </div>
+
         {error && <div className="alert error">{error}</div>}
 
         <div className="grid-4" style={{ marginBottom: '16px' }}>
-          <div className="stat-box">
-            <div className="stat-label">Investigations</div>
+          <div className="kpi-card">
+            <div className="stat-label">Total Investigations</div>
             <div className="stat-value">{cases.length}</div>
+            <div className="stat-sub">Persisted in {user.organizationId}</div>
           </div>
-          <div className="stat-box">
+          <div className="kpi-card">
             <div className="stat-label">Awaiting / Under Review</div>
             <div className="stat-value">{reviewCount}</div>
+            <div className="stat-sub">Human verification or review active</div>
           </div>
-          <div className="stat-box">
+          <div className="kpi-card">
             <div className="stat-label">Reconciled / Reported</div>
             <div className="stat-value">{reconciledCount}</div>
+            <div className="stat-sub">Deterministic runs or packs completed</div>
           </div>
-          <div className="stat-box">
-            <div className="stat-label">Active Role</div>
-            <div className="stat-value" style={{ fontSize: '16px' }}>{user.role}</div>
+          <div className="kpi-card">
+            <div className="stat-label">Active Clearance</div>
+            <div className="stat-value" style={{ fontSize: '15px', marginTop: '7px' }}>
+              <span className={`badge ${user.role === 'REVIEWER' ? 'info' : ''}`}>{user.role}</span>
+            </div>
+            <div className="stat-sub">{user.name}</div>
           </div>
         </div>
 
-        <div className="grid-2">
+        {inv1047 && (
+          <div className="spotlight-card">
+            <div className="row-between">
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                <div className="row" style={{ marginBottom: '6px' }}>
+                  <span className="badge danger">
+                    <AlertIcon size={12} />
+                    <span>Primary Demo Case</span>
+                  </span>
+                  <span className="mono" style={{ fontWeight: 700, fontSize: '14px' }}>
+                    {inv1047.caseNumber}
+                  </span>
+                  <span className={`badge ${caseStatusTone(inv1047.status)}`}>{inv1047.status}</span>
+                </div>
+                <div style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--text)' }}>
+                  {inv1047.title}
+                </div>
+                {inv1047.description && (
+                  <p className="small muted" style={{ margin: '4px 0 0' }}>
+                    {inv1047.description}
+                  </p>
+                )}
+              </div>
+              <Link href={`/cases/${encodeURIComponent(inv1047.id)}`} className="btn primary">
+                <span>Open Case Workspace</span>
+                <ArrowRightIcon size={14} />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        <div className="grid-workbench">
           <div className="card">
-            <h2>Investigations ({cases.length})</h2>
-            {cases.length === 0 ? (
+            <div className="card-header">
+              <div className="row">
+                <FolderLedgerIcon size={16} />
+                <h2 style={{ margin: 0 }}>Investigations ({filteredCases.length})</h2>
+              </div>
+              <input
+                type="search"
+                aria-label="Filter investigations"
+                placeholder="Filter by case # or title..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ minWidth: '210px' }}
+              />
+            </div>
+
+            {filteredCases.length === 0 ? (
               <p className="muted">
-                No investigations yet. Create one using the form or run{' '}
-                <code className="mono">npm run demo:reset</code> to seed INV-1047.
+                {cases.length === 0
+                  ? 'No investigations yet. Create one using the form or run npm run demo:reset to seed INV-1047.'
+                  : 'No persisted cases match your filter.'}
               </p>
             ) : (
               <div className="table-wrap">
@@ -203,27 +295,38 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th>Case #</th>
-                      <th>Title</th>
+                      <th>Investigation Scope</th>
                       <th>Status</th>
-                      <th>Open</th>
+                      <th className="text-right">Workspace</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cases.map((c) => (
-                      <tr key={c.id}>
+                    {filteredCases.map((c) => (
+                      <tr
+                        key={c.id}
+                        className={c.caseNumber === 'INV-1047' ? 'row-highlight' : undefined}
+                      >
                         <td className="mono">
                           <strong>{c.caseNumber}</strong>
                         </td>
-                        <td>
-                          <div>{c.title}</div>
-                          {c.description && <div className="small muted">{c.description}</div>}
+                        <td className="align-top">
+                          <div style={{ fontWeight: 600, color: 'var(--text)' }}>{c.title}</div>
+                          {c.description && (
+                            <div className="small muted" style={{ marginTop: '2px' }}>
+                              {c.description}
+                            </div>
+                          )}
                         </td>
                         <td>
-                          <span className="badge info">{c.status}</span>
+                          <span className={`badge ${caseStatusTone(c.status)}`}>{c.status}</span>
                         </td>
-                        <td>
-                          <Link href={`/cases/${encodeURIComponent(c.id)}`} className="btn primary small">
-                            Investigate
+                        <td className="text-right">
+                          <Link
+                            href={`/cases/${encodeURIComponent(c.id)}`}
+                            className={`btn small ${c.caseNumber === 'INV-1047' ? 'primary' : ''}`}
+                          >
+                            <span>Investigate</span>
+                            <ArrowRightIcon size={12} />
                           </Link>
                         </td>
                       </tr>
@@ -235,7 +338,10 @@ export default function DashboardPage() {
           </div>
 
           <div className="card">
-            <h2>Create Investigation</h2>
+            <div className="card-header">
+              <h2 style={{ margin: 0 }}>Create Investigation</h2>
+              <span className="badge">New Case</span>
+            </div>
             <form onSubmit={handleCreateCase} className="form-grid">
               <div className="field-group">
                 <label htmlFor="case-number">Case / Invoice Number</label>
@@ -264,6 +370,7 @@ export default function DashboardPage() {
                 <textarea
                   id="case-desc"
                   rows={2}
+                  placeholder="Dispute scope or variance summary"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -288,13 +395,13 @@ export default function DashboardPage() {
                   />
                 </div>
               </div>
-              <button type="submit" className="primary" disabled={creating}>
-                {creating ? 'Creating...' : 'Create Investigation Case'}
+              <button type="submit" className="primary" disabled={creating} style={{ width: '100%' }}>
+                {creating ? 'Creating Investigation...' : 'Create Investigation Case'}
               </button>
             </form>
           </div>
         </div>
       </main>
-    </>
+    </AppShell>
   );
 }

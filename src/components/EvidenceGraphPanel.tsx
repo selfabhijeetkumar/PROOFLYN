@@ -10,6 +10,8 @@ interface EvidenceGraphPanelProps {
   onRefresh: () => Promise<void>;
 }
 
+const LAYER_LABELS = ['Case Scope', 'Source Documents', 'Extracted / Verified Fields', 'Findings & Gaps'];
+
 export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: EvidenceGraphPanelProps) {
   const [graph, setGraph] = useState<EvidenceGraphData | null>(initialGraph);
   const [loading, setLoading] = useState(false);
@@ -57,7 +59,6 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
     'EVIDENCE_GAP',
   ];
 
-  // Minimal layered SVG positions by node category for functional node-link visualization
   const layerOrder: Record<string, number> = {
     CASE: 0,
     PURCHASE_ORDER: 1,
@@ -77,31 +78,40 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
     const layer = layerOrder[n.type] ?? 2;
     byLayer[layer].push(n);
   }
-  const svgWidth = 860;
+  const svgWidth = 960;
   const layerRows = [0, 1, 2, 3];
   const maxPerLayer = Math.max(1, ...layerRows.map((l) => byLayer[l].length));
-  const svgHeight = Math.max(320, maxPerLayer * 38 + 60);
+  const svgHeight = Math.max(360, maxPerLayer * 42 + 72);
 
   for (const layer of layerRows) {
     const list = byLayer[layer];
-    const x = 100 + layer * 220;
+    const x = 60 + layer * 240;
     list.forEach((n, idx) => {
-      const y = 32 + idx * Math.max(28, Math.floor((svgHeight - 60) / Math.max(1, list.length)));
+      const y = 52 + idx * Math.max(32, Math.floor((svgHeight - 76) / Math.max(1, list.length)));
       coords.set(n.id, { x, y });
     });
   }
+
+  const nodeStyle = (type: GraphNodeType) => {
+    if (type === 'DISCREPANCY') return { fill: '#fee4e2', stroke: '#b42318', text: '#b42318' };
+    if (type === 'EVIDENCE_GAP') return { fill: '#fef6ee', stroke: '#a15c07', text: '#a15c07' };
+    if (type === 'CONFIRMED_FIELD') return { fill: '#e7f4ee', stroke: '#126e47', text: '#126e47' };
+    return { fill: '#eef3f9', stroke: '#0f2744', text: '#0f2744' };
+  };
 
   return (
     <div>
       {error && <div className="alert error">{error}</div>}
 
       <div className="card">
-        <div className="row-between">
+        <div className="card-header">
           <div>
-            <h3>Explainable Evidence Graph (MCP <code className="mono">get_evidence_graph</code>)</h3>
-            <p className="small muted">
-              Nodes and provenance edges linking case, source documents, extracted/verified fields,
-              discrepancies, and evidence gaps. Every edge carries a rule ID or derivation rule.
+            <h3 style={{ margin: 0 }}>
+              Explainable Evidence Graph (MCP <code className="mono">get_evidence_graph</code>)
+            </h3>
+            <p className="small muted" style={{ margin: '2px 0 0' }}>
+              Provenance topology linking case, source documents, extracted/verified fields,
+              discrepancies, and evidence gaps. Click any node to highlight its derivation path.
             </p>
           </div>
           <button type="button" className="primary" onClick={loadGraphViaMcp} disabled={loading}>
@@ -110,35 +120,63 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
         </div>
 
         {!activeGraph ? (
-          <div className="alert warn" style={{ marginTop: '12px' }}>
+          <div className="alert warn" style={{ marginBottom: 0 }}>
             Click &ldquo;Refresh Graph via MCP&rdquo; to build and inspect the persisted evidence graph.
           </div>
         ) : (
-          <div style={{ marginTop: '12px' }}>
-            <div className="row" style={{ marginBottom: '12px' }}>
-              <span className="badge info">Nodes: {nodes.length}</span>
-              <span className="badge info">Edges: {edges.length}</span>
-              <label htmlFor="graph-filter" className="small muted">Filter node type:</label>
-              <select
-                id="graph-filter"
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as GraphNodeType | 'ALL')}
-              >
-                {nodeTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              {selectedNode && (
-                <button type="button" onClick={() => setSelectedNodeId(null)}>
-                  Clear Selection ({selectedNode.label})
-                </button>
-              )}
+          <div>
+            <div className="row-between" style={{ marginBottom: '12px' }}>
+              <div className="row">
+                <span className="badge info">Nodes: {nodes.length}</span>
+                <span className="badge info">Provenance Edges: {edges.length}</span>
+                <span className="badge ok">Verified Node</span>
+                <span className="badge warn">Gap Node</span>
+                <span className="badge danger">Discrepancy Node</span>
+              </div>
+
+              <div className="row">
+                <label htmlFor="graph-filter" className="small muted">Filter type:</label>
+                <select
+                  id="graph-filter"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as GraphNodeType | 'ALL')}
+                >
+                  {nodeTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                {selectedNode && (
+                  <button type="button" className="small" onClick={() => setSelectedNodeId(null)}>
+                    Clear ({selectedNode.label.slice(0, 20)})
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="table-wrap" style={{ border: '1px solid var(--border)', borderRadius: '4px', marginBottom: '16px', background: 'var(--surface-muted)' }}>
+            <div
+              className="table-wrap"
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                marginBottom: '16px',
+                background: 'var(--surface-subtle)',
+              }}
+            >
               <svg width={svgWidth} height={svgHeight} role="img" aria-label="Evidence Graph Diagram">
+                {layerRows.map((layer) => (
+                  <text
+                    key={layer}
+                    x={60 + layer * 240}
+                    y={24}
+                    fontSize="10"
+                    fontWeight="700"
+                    fill="#5f6c7b"
+                  >
+                    {LAYER_LABELS[layer].toUpperCase()}
+                  </text>
+                ))}
                 {edges.map((edge) => {
                   const s = coords.get(edge.source);
                   const t = coords.get(edge.target);
@@ -148,13 +186,13 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
                   return (
                     <line
                       key={edge.id}
-                      x1={s.x}
+                      x1={s.x + 8}
                       y1={s.y}
-                      x2={t.x}
+                      x2={t.x - 8}
                       y2={t.y}
-                      stroke={highlighted ? '#1f3a5f' : '#cbd2da'}
+                      stroke={highlighted ? '#0f2744' : '#cbd3de'}
                       strokeWidth={highlighted ? 1.5 : 1}
-                      strokeOpacity={highlighted ? 0.75 : 0.3}
+                      strokeOpacity={highlighted ? 0.65 : 0.3}
                     />
                   );
                 })}
@@ -162,28 +200,31 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
                   const pos = coords.get(node.id);
                   if (!pos) return null;
                   const isSelected = node.id === selectedNodeId;
+                  const st = nodeStyle(node.type);
                   return (
                     <g
                       key={node.id}
                       onClick={() => setSelectedNodeId(isSelected ? null : node.id)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <circle
-                        cx={pos.x}
-                        cy={pos.y}
-                        r={isSelected ? 8 : 6}
-                        fill={
-                          node.type === 'DISCREPANCY'
-                            ? '#8b1e1e'
-                            : node.type === 'EVIDENCE_GAP'
-                              ? '#7a4f01'
-                              : node.type === 'CONFIRMED_FIELD'
-                                ? '#155724'
-                                : '#1f3a5f'
-                        }
+                      <rect
+                        x={pos.x - 8}
+                        y={pos.y - 11}
+                        width={176}
+                        height={22}
+                        rx={3}
+                        fill={st.fill}
+                        stroke={isSelected ? '#0b192c' : st.stroke}
+                        strokeWidth={isSelected ? 2 : 1}
                       />
-                      <text x={pos.x + 10} y={pos.y + 4} fontSize="10" fill="#181c20">
-                        {node.label.slice(0, 28)}
+                      <text
+                        x={pos.x}
+                        y={pos.y + 4}
+                        fontSize="10.5"
+                        fontWeight={isSelected ? '700' : '600'}
+                        fill={st.text}
+                      >
+                        {node.label.slice(0, 24)}
                       </text>
                     </g>
                   );
@@ -199,7 +240,7 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
                     <thead>
                       <tr>
                         <th>Type</th>
-                        <th>Label</th>
+                        <th>Node Label</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -207,15 +248,13 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
                         <tr
                           key={n.id}
                           onClick={() => setSelectedNodeId(n.id === selectedNodeId ? null : n.id)}
-                          style={{
-                            cursor: 'pointer',
-                            background: n.id === selectedNodeId ? 'var(--info-bg)' : undefined,
-                          }}
+                          className={n.id === selectedNodeId ? 'row-selected' : undefined}
+                          style={{ cursor: 'pointer' }}
                         >
                           <td>
                             <span className="badge">{n.type}</span>
                           </td>
-                          <td className="small">{n.label}</td>
+                          <td className="small" style={{ fontWeight: 500 }}>{n.label}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -226,7 +265,7 @@ export function EvidenceGraphPanel({ caseId, initialGraph, onRefresh }: Evidence
               <div>
                 <h4>
                   Provenance Edges ({connectedEdges.length}
-                  {selectedNode ? ` for ${selectedNode.label}` : ''})
+                  {selectedNode ? ` connected to ${selectedNode.label}` : ''})
                 </h4>
                 <div className="table-wrap" style={{ maxHeight: '340px', overflowY: 'auto' }}>
                   <table>
