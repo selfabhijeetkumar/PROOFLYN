@@ -22,9 +22,9 @@ Open `http://localhost:3000`.
 
 ## 2. Live Walkthrough: Golden Case `INV-1047`
 
-1. **Sign In (Investigator):**
-   - Email: value of `DEMO_INVESTIGATOR_EMAIL` (default `investigator@prooflyn.dev`)
-   - Password: value of `DEMO_INVESTIGATOR_PASSWORD` from `.env`
+1. **Automatic Demo Session (Investigator):**
+   - With `PROOFLYN_LOCAL_DEMO_MODE=true` in local `.env`, opening `http://localhost:3000` automatically establishes a signed `HttpOnly` session for the seeded Investigator (`DEMO_INVESTIGATOR_EMAIL`, default `investigator@prooflyn.dev`) on loopback requests without entering credentials.
+   - If `PROOFLYN_LOCAL_DEMO_MODE` is `false`/unset, sign in using `DEMO_INVESTIGATOR_EMAIL` / `DEMO_INVESTIGATOR_PASSWORD` from `.env`.
    - Show the Investigation Dashboard listing `INV-1047` (*TechCorp Solutions Industrial Valves Q4 Dispute*) plus edge-case demo fixtures (`INV-2001` Missing Delivery, `INV-2002` Duplicate Invoice, `INV-2003` Partial Delivery).
 2. **Inspect Case & Documents Tab:**
    - Open `INV-1047`.

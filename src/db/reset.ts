@@ -33,7 +33,17 @@ function main(): void {
   for (const suffix of ['', '-wal', '-shm']) {
     const target = `${dbPath}${suffix}`;
     if (fs.existsSync(target)) {
-      fs.unlinkSync(target);
+      try {
+        fs.unlinkSync(target);
+      } catch (err: unknown) {
+        const code = (err as { code?: string }).code;
+        if (code === 'EBUSY' || code === 'EPERM') {
+          throw new Error(
+            `Cannot reset database (${target} is locked by another running process). Stop the running PROOFLYN server (Ctrl+C) and re-run npm run demo:reset.`
+          );
+        }
+        throw err;
+      }
     }
   }
 

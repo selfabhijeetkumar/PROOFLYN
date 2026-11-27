@@ -20,7 +20,9 @@ import { closeDb, getDb } from '@/db/connection';
 import { seedDatabase } from '@/db/seed-data';
 import { getMcpGateway, McpGatewayError } from '@/mcp/gateway';
 import { GET as caseDetailGet } from '@/app/api/v1/cases/[id]/route';
+import { GET as casesGet } from '@/app/api/v1/cases/route';
 import { POST as loginPost } from '@/app/api/v1/auth/login/route';
+import { GET as meGet } from '@/app/api/v1/auth/me/route';
 import { extractFieldsFromText, parseDecimalToMinorUnits } from '@/server/extraction';
 import { redactValue } from '@/server/logger';
 import { checkRateLimit, resetRateLimitsForTests } from '@/server/rate-limit';
@@ -299,5 +301,97 @@ describe('PROOFLYN M7 Security, Extraction, Tamper Detection & MCP Reliability',
     const calls = repo.listMcpToolCalls('non-existent-case-id');
     expect(calls.length).toBeGreaterThanOrEqual(1);
     expect(calls[calls.length - 1].status).toBe('ERROR');
+  });
+
+  it('establishes local demo session ONLY when PROOFLYN_LOCAL_DEMO_MODE=true on loopback non-deployed requests', async () => {
+    const prevDemoMode = process.env.PROOFLYN_LOCAL_DEMO_MODE;
+    const prevDemoEmail = process.env.DEMO_INVESTIGATOR_EMAIL;
+    const prevVercel = process.env.VERCEL;
+    const prevAppEnv = process.env.APP_ENV;
+    const prevSecure = process.env.COOKIE_SECURE;
+
+    try {
+      process.env.DEMO_INVESTIGATOR_EMAIL = invEmail;
+
+      // 1. Disabled by default -> 401
+      process.env.PROOFLYN_LOCAL_DEMO_MODE = 'false';
+      const disabledRes = await meGet(new Request('http://localhost:3000/api/v1/auth/me'));
+      expect(disabledRes.status).toBe(401);
+
+      // 2. Enabled on localhost -> issues real signed httpOnly cookie for seeded INVESTIGATOR
+      process.env.PROOFLYN_LOCAL_DEMO_MODE = 'true';
+      const okRes = await meGet(
+        new Request('http://127.0.0.1:3000/api/v1/auth/me', {
+          headers: { host: '127.0.0.1:3000' },
+        })
+      );
+      expect(okRes.status).toBe(200);
+      const okJson = await okRes.json();
+      expect(okJson.data.user.email).toBe(invEmail);
+      expect(okJson.data.user.role).toBe('INVESTIGATOR');
+      expect(okJson.data.localDemoMode).toBe(true);
+      const setCookie = okRes.headers.get('set-cookie');
+      expect(setCookie).toContain('HttpOnly');
+
+      // Cookie grants access to protected routes while cookie-less protected call remains 401
+      const cookieOnly = (setCookie || '').split(';')[0];
+      const authedCases = await casesGet(
+        new Request('http://127.0.0.1:3000/api/v1/cases', { headers: { cookie: cookieOnly } })
+      );
+      expect(authedCases.status).toBe(200);
+      const unauthCases = await casesGet(new Request('http://127.0.0.1:3000/api/v1/cases'));
+      expect(unauthCases.status).toBe(401);
+
+      // 3. Rejects non-loopback host, forwarded host, external origin, and deployed environment flags
+      const badHost = await meGet(
+        new Request('http://localhost:3000/api/v1/auth/me', {
+          headers: { host: 'demo.example.com' },
+        })
+      );
+      expect(badHost.status).toBe(401);
+
+      const badForwarded = await meGet(
+        new Request('http://localhost:3000/api/v1/auth/me', {
+          headers: { host: 'localhost:3000', 'x-forwarded-host': 'evil.example.com' },
+        })
+      );
+      expect(badForwarded.status).toBe(401);
+
+      const badForwardedFor = await meGet(
+        new Request('http://localhost:3000/api/v1/auth/me', {
+          headers: { host: 'localhost:3000', 'x-forwarded-for': '203.0.113.10' },
+        })
+      );
+      expect(badForwardedFor.status).toBe(401);
+
+      process.env.VERCEL = '1';
+      const vercelRes = await meGet(new Request('http://localhost:3000/api/v1/auth/me'));
+      expect(vercelRes.status).toBe(401);
+      delete process.env.VERCEL;
+
+      process.env.APP_ENV = 'production';
+      const prodAppRes = await meGet(new Request('http://localhost:3000/api/v1/auth/me'));
+      expect(prodAppRes.status).toBe(401);
+      delete process.env.APP_ENV;
+
+      process.env.COOKIE_SECURE = 'true';
+      const secureCookieRes = await meGet(new Request('http://localhost:3000/api/v1/auth/me'));
+      expect(secureCookieRes.status).toBe(401);
+    } finally {
+      if (prevDemoMode === undefined) delete process.env.PROOFLYN_LOCAL_DEMO_MODE;
+      else process.env.PROOFLYN_LOCAL_DEMO_MODE = prevDemoMode;
+
+      if (prevDemoEmail === undefined) delete process.env.DEMO_INVESTIGATOR_EMAIL;
+      else process.env.DEMO_INVESTIGATOR_EMAIL = prevDemoEmail;
+
+      if (prevVercel === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = prevVercel;
+
+      if (prevAppEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevAppEnv;
+
+      if (prevSecure === undefined) delete process.env.COOKIE_SECURE;
+      else process.env.COOKIE_SECURE = prevSecure;
+    }
   });
 });

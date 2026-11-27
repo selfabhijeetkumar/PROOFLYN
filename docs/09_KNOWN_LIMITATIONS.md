@@ -14,8 +14,10 @@
 5. **External MCP Inspector Binary Not Installed Locally:**
    - `npx --no-install @modelcontextprotocol/inspector --version` returned exit code `1` offline. External Inspector UI attachment is documented in `docs/08_JUDGES_DEMO_SCRIPT.md` and marked `UNVERIFIED`. Real stdio MCP execution is verified via `npm run mcp:smoke`.
 6. **Browser-Click E2E Not Executed:**
-   - Playwright (`1.65.1`) is present in environment binaries, and we verified SSR pages, security headers, APIs, and MCP-in-Next via live `next start` HTTP requests plus 29 Vitest tests, but a scripted mouse-click Playwright browser UI walkthrough was not run.
-7. **Dependency Advisories:**
+   - Automated Chrome DevTools browser verification failed to attach (`DevToolsActivePort` missing / Chrome remote debugging disabled), and `playwright` is not installed as a local project dependency. SSR pages, auto-issued local demo `HttpOnly` sessions, security headers, APIs, and MCP-in-Next workflows were verified against live `http://localhost:3000`.
+7. **Local Hackathon Demo Auto-Session (`PROOFLYN_LOCAL_DEMO_MODE=true`):**
+   - For local hackathon demos, `.env` sets `PROOFLYN_LOCAL_DEMO_MODE=true` so `GET /api/v1/auth/me` issues a signed `HttpOnly` session cookie for the seeded `INVESTIGATOR` account on strict loopback (`localhost` / `127.0.0.1`) requests when no session exists. This flag defaults to `false` (disabled) in `.env.example` and is rejected on non-loopback hosts, reverse-proxied requests, or deployed environments (`VERCEL`, `RAILWAY_ENVIRONMENT`, `FLY_APP_NAME`, `RENDER`, `APP_ENV=production`, `COOKIE_SECURE=true`, etc.). Protected `/api/v1/cases*` routes still require valid cookies. Demonstrating `REVIEWER`-only blocker actions requires clicking **Sign out** and signing in as `DEMO_REVIEWER_EMAIL`.
+8. **Dependency Advisories:**
    - `pnpm audit --prod` reports 5 advisories (`postcss@8.4.31` inside `next@15.5.29`, `zod@3.25.76`), and `pnpm audit` reports 5 dev-only advisories (`tinypool@1.1.1`, `vitest@3.2.7`). See triage rationale in `docs/06_TESTING_AND_SECURITY_REPORT.md`.
 8. **OCR / Multi-Page Scanned PDFs:**
    - `PDF_TEXT` extracts embedded text streams via `pdf-parse`; image-only scanned PDFs without embedded text return `0` fields with a clear warning and require manual field entry.

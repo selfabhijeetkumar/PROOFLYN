@@ -14,20 +14,21 @@ COMPLETE — M0 through M8 implemented, verified (`npm run verify` 8/8 PASS, 29/
 - **M7 & M8 (2026-11-27T10:17+05:30)**: Added `src/server/__tests__/security-and-reliability.test.ts` (7 tests), built `src/scripts/verify.ts` (`npm run verify`), audited prod/dev dependencies (`pnpm audit`), verified live `next start` server + `npm run demo:reset`, and authored `docs/06_TESTING_AND_SECURITY_REPORT.md`, `docs/08_JUDGES_DEMO_SCRIPT.md`, `docs/09_KNOWN_LIMITATIONS.md`, and `docs/10_FINAL_ACCEPTANCE_REPORT.md`.
 
 ## TESTS RUN
-- `npm run verify` -> **PASS (`8/8` checks, exit code `0`, `86.2s`)**:
+- `npm run verify` -> **PASS (`8/8` checks, exit code `0`)**:
   - `dependency-check` -> PASS
   - `typecheck` (`npx tsc --noEmit`) -> PASS (0 errors)
   - `lint` (`npx eslint src`) -> PASS (0 errors, 0 warnings)
-  - `vitest` (`npx vitest run`) -> PASS (**29 passed (29)** across 3 files: 18 core + 4 API/MCP integration + 7 security/reliability)
+  - `vitest` (`npx vitest run`) -> PASS (**30 passed (30)** across 3 files: 18 core + 4 API/MCP integration + 8 security/reliability & demo-mode guards)
   - `mcp:smoke` (`npx tsx src/mcp/smoke-test.ts`) -> PASS (all 6 tools over real stdio, unknown field rejected, `INV-1047` `R-QTY-01` verified, 6 `SUCCESS` rows)
   - `demo:reset` -> PASS (clean rebuild + 3 synthetic PDFs + `INV-1047`)
   - `post-reset-validation` -> PASS (`docs=3`, `fields=12`, `events=5`, `chainValid=true`, `filesOnDisk=true`)
   - `next-build` -> PASS (25 routes built cleanly)
-- Live production server check (`npx next start -p 3100`) -> PASS (`/` 200, security headers verified, `/cases/case-inv-1047` 200, MCP reconcile `R-QTY-01` 90 vs 100 / 1,250,000 minor units), followed by `npm run demo:reset` -> PASS.
+- Live `http://localhost:3000` (`npx next start -p 3000 -H 127.0.0.1`) -> PASS (`/` 200, `/api/v1/auth/me` issues `HttpOnly` demo Investigator cookie on loopback with `localDemoMode: true`, unauthenticated `/api/v1/cases` still returns `401`, `/cases/case-inv-1047` 200, MCP reconcile `R-QTY-01` 90 vs 100 / 1,250,000 minor units, graph `19` nodes, `4` logged MCP calls).
 
 ## OPEN ERRORS / KNOWN LIMITATIONS
-- `.env` is present locally (gitignored) with demo credentials so `npm run demo:reset` and `npm run verify` run out of the box; real secrets should be configured before non-demo use.
+- `.env` is present locally (gitignored) with demo credentials and `PROOFLYN_LOCAL_DEMO_MODE=true` for hackathon convenience (`PROOFLYN_LOCAL_DEMO_MODE=false` by default in `.env.example`, blocked on non-loopback/deployed hosts).
 - External `@modelcontextprotocol/inspector` CLI is not pre-installed offline (`UNVERIFIED`); stdio protocol compliance is verified via `npm run mcp:smoke`.
+- Chrome DevTools / Playwright live browser click-through was unavailable (`DevToolsActivePort` not open, `playwright` package not installed in workspace); SSR pages + auto-session + API/MCP workflow verified live on `http://localhost:3000`.
 - Optional Gemini Vision (`GEMINI_API_KEY`) was not tested with live API keys in this run; deterministic parsing + manual entry work standalone.
 - See `docs/09_KNOWN_LIMITATIONS.md` for full details.
 
