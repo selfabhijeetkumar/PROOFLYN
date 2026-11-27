@@ -17,3 +17,13 @@
 
 - **M4 Server & API Layer**: Implemented `src/server/auth.ts` (HMAC-SHA256 signed `httpOnly` cookie sessions + RBAC), `src/server/rate-limit.ts`, `src/server/upload.ts` (extension allowlist, magic-byte validation, executable/archive rejection, 10 MB cap, UUID storage outside `public/`), `src/server/extraction.ts` (`PDF_TEXT` with `Uint8Array` copy fix for `pdf-parse`/`pdf.js` on Node v26, `CSV_PARSE`, `MANUAL`, optional `AI_VISION` gated on `GEMINI_API_KEY`), `src/server/api-helpers.ts`, `src/db/seed.ts`, `src/db/reset.ts`, and 21 REST route handlers under `src/app/api/v1/`.
 - **Verification**: `npm run typecheck` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm test` (22/22 passed: 18 core unit tests + 4 comprehensive M4 API/security/upload/MCP/RBAC/idempotency integration tests).
+
+## 2026-11-27T09:44+05:30 — M5 & M6 Complete (Commit `c51d5f5`)
+
+- **M5–M6 Functional Frontend & Design Handoff**: Implemented frozen neutral CSS tokens (`src/app/globals.css`), `src/app/layout.tsx`, `src/app/page.tsx` (login gate, case list, create investigation form), `src/app/cases/[id]/page.tsx`, `src/lib/api-client.ts`, modular components (`TopBar.tsx`, `CaseWorkspace.tsx`, `DocumentsPanel.tsx`, `FieldsVerificationPanel.tsx`, `ReconciliationPanel.tsx`, `EvidenceGraphPanel.tsx`, `TimelineAndMcpPanel.tsx`, `ReportPackPanel.tsx`), and `docs/07_DESIGN_HANDOFF.md`.
+- **Verification**: `npm run typecheck` (0 errors), `npm run lint` (0 errors/warnings), `npm test` (22/22 passed), `next build` exit 0.
+
+## 2026-11-27T10:17+05:30 — M7 & M8 Complete
+
+- **M7 Security, Reliability & Unified Verification**: Added `src/server/__tests__/security-and-reliability.test.ts` (7 tests covering minor-unit decimal parsing, deterministic text extraction, logger secret redaction, report HTML XSS escaping + snapshot reproducibility, event hash-chain tamper detection, fixed-window rate limiting, and invalid-ID/MCP error persistence). Built `src/scripts/verify.ts` wired to `npm run verify` (`package.json`). Audited dependencies (`pnpm audit --prod` & `pnpm audit`) and documented triage in `docs/06_TESTING_AND_SECURITY_REPORT.md`.
+- **M8 Demo Preparation & Acceptance**: Verified `npm run verify` (**8/8 passed**: `dependency-check`, `typecheck`, `lint`, `vitest` **29/29**, `mcp:smoke`, `demo:reset`, `post-reset-validation`, `next-build`). Tested live `npx next start -p 3100` against seeded `INV-1047` (HTTP 200 on `/` and `/cases/case-inv-1047`, security headers verified, MCP-backed reconcile `R-QTY-01` 90 vs 100 / 1,250,000 minor units, 3 logged MCP calls), then reset demo state via `npm run demo:reset`. Authored `docs/08_JUDGES_DEMO_SCRIPT.md`, `docs/09_KNOWN_LIMITATIONS.md`, and `docs/10_FINAL_ACCEPTANCE_REPORT.md`.
